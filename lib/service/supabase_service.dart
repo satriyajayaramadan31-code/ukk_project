@@ -67,7 +67,7 @@ class SupabaseService {
 
       final user = await _client
           .from('user')
-          .select('password, role, token, username')
+          .select('id, password, role, token, username')
           .eq('username', username)
           .maybeSingle();
 

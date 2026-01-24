@@ -2,19 +2,21 @@ import 'package:flutter/material.dart';
 import '../utils/models.dart';
 import '../utils/theme.dart';
 
-class AddAlatDialog extends StatefulWidget {
+class EditAlatDialog extends StatefulWidget {
+  final Alat alat;
   final List<String> categories;
 
-  const AddAlatDialog({
+  const EditAlatDialog({
     super.key,
+    required this.alat,
     required this.categories,
   });
 
   @override
-  State<AddAlatDialog> createState() => _AddAlatDialogState();
+  State<EditAlatDialog> createState() => _EditAlatDialogState();
 }
 
-class _AddAlatDialogState extends State<AddAlatDialog> {
+class _EditAlatDialogState extends State<EditAlatDialog> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
 
@@ -36,6 +38,18 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
           width: 1.5,
         ),
       );
+
+  @override
+  void initState() {
+    super.initState();
+
+    // pre-fill data dari alat yang mau diedit
+    nameController.text = widget.alat.name;
+    descriptionController.text = widget.alat.description;
+    selectedCategory = widget.alat.category;
+    status = widget.alat.status;
+    imagePath = widget.alat.image;
+  }
 
   // ================= SUCCESS POPUP =================
   void _showSuccessPopup() {
@@ -71,7 +85,7 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  "Alat Berhasil Ditambahkan",
+                  "Alat Berhasil Diperbarui",
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
@@ -101,7 +115,7 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
     if (nameError || categoryError || descriptionError || imageError) return;
 
     final result = Alat(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: widget.alat.id,
       name: nameController.text.trim(),
       category: selectedCategory!,
       description: descriptionController.text.trim(),
@@ -134,7 +148,7 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
               // ================= TITLE =================
               Center(
                 child: Text(
-                  "Tambah Alat",
+                  "Edit Alat",
                   style: theme.textTheme.headlineSmall,
                 ),
               ),
@@ -196,7 +210,7 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      child: const Text("Tambah"),
+                      child: const Text("Simpan"),
                     ),
                   ),
                   const SizedBox(width: 12),

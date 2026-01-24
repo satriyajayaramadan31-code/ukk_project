@@ -76,7 +76,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface, // ganti surface
+      backgroundColor: Theme.of(context).colorScheme.primaryContainer, // ganti surface
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -90,6 +90,7 @@ class _LoginPageState extends State<LoginPage> {
                 return SizedBox(
                   width: maxWidth,
                   child: Card(
+                    color: Theme.of(context).colorScheme.background,
                     elevation: 4,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -103,19 +104,19 @@ class _LoginPageState extends State<LoginPage> {
                             width: 64,
                             height: 64,
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primary,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.inventory_2,
                               color: Theme.of(context).colorScheme.onPrimary,
-                              size: 32,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Theme.of(context).colorScheme.primary,
+                                width: 2,
+                              ),
                             ),
+                            child: Image.asset('image/logo.png')
                           ),
                           const SizedBox(height: 20),
 
                           Text(
-                            'Aplikasi Peminjaman Alat',
+                            'Mesin Kita',
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.headlineSmall,
                           ),

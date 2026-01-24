@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../utils/theme.dart';
 
 class StatCard extends StatelessWidget {
   final String title;
@@ -17,6 +16,8 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -28,7 +29,7 @@ class StatCard extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min, // 🔥 PENTING
+          mainAxisSize: MainAxisSize.min,
           children: [
             /// HEADER
             Row(
@@ -36,7 +37,7 @@ class StatCard extends StatelessWidget {
                 Icon(
                   icon,
                   size: 24,
-                  color: iconColor ?? AppTheme.primary,
+                  color: iconColor ?? theme.colorScheme.primary,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -44,7 +45,7 @@ class StatCard extends StatelessWidget {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: theme.textTheme.bodyMedium,
                   ),
                 ),
               ],
@@ -52,18 +53,15 @@ class StatCard extends StatelessWidget {
 
             const SizedBox(height: 6),
 
-            /// VALUE (ADAPTIF TANPA SPACE KOSONG)
-            Flexible(
-              fit: FlexFit.loose,
-              child: Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.visible,
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  height: 1.15,
-                ),
+            /// VALUE
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                height: 1.15,
               ),
             ),
           ],

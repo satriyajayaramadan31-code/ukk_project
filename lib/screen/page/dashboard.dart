@@ -15,6 +15,8 @@ class DashboardPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     const stats = {
       'totalEquipment': 45,
       'activeLoans': 12,
@@ -23,40 +25,33 @@ class DashboardPage extends StatelessWidget {
     };
 
     final List<Widget> statCards = [
-      if (role == 'admin')
-        StatCard(
-          title: 'Alat',
-          value: stats['totalEquipment'].toString(),
-          icon: Icons.inventory_2,
-        ),
+      StatCard(
+        title: 'Alat',
+        value: stats['totalEquipment'].toString(),
+        icon: Icons.inventory_2,
+      ),
       StatCard(
         title: 'Dipinjam',
         value: stats['activeLoans'].toString(),
         icon: Icons.assignment,
       ),
-      if (role == 'admin' || role == 'petugas')
-        StatCard(
-          title: 'Menunggu',
-          value: stats['pendingApprovals'].toString(),
-          icon: Icons.trending_up,
-          iconColor: AppTheme.statusPending,
-        ),
-      if (role == 'admin' || role == 'petugas')
-        StatCard(
-          title: 'Terlambat',
-          value: stats['overdueReturns'].toString(),
-          icon: Icons.warning_amber,
-          iconColor: AppTheme.statusLate,
-        ),
+      StatCard(
+        title: 'Menunggu',
+        value: stats['pendingApprovals'].toString(),
+        icon: Icons.trending_up,
+        iconColor: AppTheme.statusPending,
+      ),
+      StatCard(
+        title: 'Terlambat',
+        value: stats['overdueReturns'].toString(),
+        icon: Icons.warning_amber,
+        iconColor: AppTheme.statusLate,
+      ),
     ];
 
     return Scaffold(
-      appBar: const AppBarWithMenu(
-        title: 'Dashboard',
-      ),
-      drawer: SideMenu(
-        role: role, // 👉 hanya ini saja
-      ),
+      appBar: const AppBarWithMenu(title: 'Dashboard'),
+      drawer: SideMenu(role: role),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -74,39 +69,47 @@ class DashboardPage extends StatelessWidget {
               ),
               itemBuilder: (context, index) => statCards[index],
             ),
+
             const SizedBox(height: 24),
-            if (role != 'petugas')
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'Aktivitas Terkini',
-                        style: TextStyle(fontSize: 20),
-                      ),
-                      SizedBox(height: 16),
-                      ActivityItem(
-                        item: 'Kamera DSLR Canon',
-                        status: 'Menunggu',
-                        time: '2 jam lalu',
-                      ),
-                      ActivityItem(
-                        item: 'Laptop Dell XPS',
-                        status: 'Dikembalikan',
-                        time: '3 jam lalu',
-                      ),
-                      ActivityItem(
-                        item: 'Proyektor Epson',
-                        status: 'Dipinjam',
-                        time: '5 jam lalu',
-                        isLast: true,
-                      ),
-                    ],
-                  ),
+
+            Card(
+              color: theme.colorScheme.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Aktivitas Terkini',
+                      style: theme.textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Activity list
+                    const ActivityItem(
+                      item: 'Kamera DSLR Canon',
+                      status: 'Menunggu',
+                      time: '2 jam lalu',
+                    ),
+                    const ActivityItem(
+                      item: 'Laptop Dell XPS',
+                      status: 'Dikembalikan',
+                      time: '3 jam lalu',
+                    ),
+                    const ActivityItem(
+                      item: 'Proyektor Epson',
+                      status: 'Dipinjam',
+                      time: '5 jam lalu',
+                      isLast: true,
+                    ),
+                  ],
                 ),
               ),
+            ),
           ],
         ),
       ),

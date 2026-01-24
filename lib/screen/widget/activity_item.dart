@@ -8,6 +8,7 @@ class ActivityItem extends StatelessWidget {
   final bool isLast;
 
   const ActivityItem({
+    super.key,
     required this.item,
     required this.status,
     required this.time,
@@ -29,6 +30,8 @@ class ActivityItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Column(
       children: [
         Row(
@@ -42,14 +45,13 @@ class ActivityItem extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     item,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: theme.textTheme.bodyMedium,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
 
-            // SPASI
             const SizedBox(width: 12),
 
             // BAGIAN KANAN
@@ -59,31 +61,38 @@ class ActivityItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: getStatusColor(),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       status,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onPrimary,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     time,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: theme.textTheme.bodySmall,
                   ),
                 ],
               ),
             ),
           ],
         ),
-        if (!isLast) const Divider(height: 24),
+
+        if (!isLast)
+          Divider(
+            height: 24,
+            color: theme.dividerColor,
+          ),
       ],
     );
   }

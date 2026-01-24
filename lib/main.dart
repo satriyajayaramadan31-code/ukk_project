@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import '../service/supabase_service.dart';
 import '../service/navigation_service.dart';
@@ -9,9 +10,19 @@ import '../screen/page/dashboard.dart';
 import '../screen/page/kategori.dart';
 import '../screen/utils/theme.dart';
 import '../screen/page/daftar_alat.dart';
+import '../screen/page/user.dart';
+import '../screen/page/daftar_pinjam.dart';
+import '../screen/page/logs.dart';
+import '../screen/page/penerimaan.dart';
+import '../screen/page/laporan.dart';
+import '../screen/page/alat.dart';
+import '../screen/page/peminjaman.dart';
+import '../screen/page/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await initializeDateFormatting('id', null);
 
   await Supabase.initialize(
     url: 'https://wepurbkcpvwxuevcqzmd.supabase.co',
@@ -36,14 +47,16 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: NavigationService.navigatorKey, // HARUS ADA
+      navigatorKey: NavigationService.navigatorKey,
       debugShowCheckedModeBanner: false,
-      title: 'PeMeJam',
+      title: 'MesinKita',
       theme: AppTheme.lightTheme(context),
 
-      initialRoute: '/',
+      // 🔑 START DARI SPLASH
+      initialRoute: '/splash',
       routes: {
-        '/': (_) => const AuthGate(),
+        '/splash': (_) => const SplashScreen(),
+        '/auth': (_) => const AuthGate(),
         '/login': (_) => const LoginPage(),
 
         '/dashboard': (context) {
@@ -54,6 +67,13 @@ class MyApp extends StatelessWidget {
 
         '/kategori': (_) => const KategoriPage(),
         '/daftaralat': (_) => const DaftarAlatPage(),
+        '/user': (_) => const UserPage(),
+        '/daftarpeminjaman': (_) => const DaftarPinjam(),
+        '/logs': (_) => const LogsPage(),
+        '/penerimaan': (_) => const PenerimaanPage(),
+        '/laporan': (_) => const LaporanPage(),
+        '/alat': (_) => const AlatPage(),
+        '/pinjam': (_) => const PeminjamanPage(),
       },
     );
   }
@@ -72,9 +92,7 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkAuth();
-    });
+    _checkAuth();
   }
 
   Future<void> _checkAuth() async {

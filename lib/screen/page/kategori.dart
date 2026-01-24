@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../widget/app_bar.dart';
 import '../widget/side_menu.dart';
+import '../widget/add_category.dart';
+import '../widget/edit_category.dart';
+import '../widget/delete_category.dart';
 
 class Category {
   final String id;
@@ -30,10 +33,7 @@ class _KategoriPageState extends State<KategoriPage> {
     Category(id: '5', name: 'Presentasi', totalItems: 4),
   ];
 
-  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
-
-  Category? _editingCategory;
   List<Category> _filteredCategories = [];
 
   @override
@@ -42,181 +42,229 @@ class _KategoriPageState extends State<KategoriPage> {
     _filteredCategories = _categories;
   }
 
-  void _openForm({Category? category}) {
-    _editingCategory = category;
-    _nameController.text = category?.name ?? '';
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(category == null ? 'Tambah Kategori' : 'Edit Kategori'),
-        content: TextField(
-          controller: _nameController,
-          decoration: const InputDecoration(labelText: 'Nama Kategori'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: _saveCategory,
-            child: Text(category == null ? 'Tambah' : 'Simpan'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _saveCategory() {
-    final name = _nameController.text.trim();
-    if (name.isEmpty) return;
-
-    setState(() {
-      if (_editingCategory != null) {
-        _editingCategory!.name = name;
-      } else {
-        _categories.add(
-          Category(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            name: name,
-            totalItems: 0,
-          ),
-        );
-      }
-
-      _filterCategories();
-    });
-
-    Navigator.pop(context);
-  }
-
-  void _deleteCategory(Category category) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Hapus Kategori'),
-        content: const Text('Yakin ingin menghapus kategori ini?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Hapus')),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      setState(() {
-        _categories.remove(category);
-        _filterCategories();
-      });
-    }
-  }
-
   void _filterCategories() {
     final query = _searchController.text.toLowerCase();
     setState(() {
-      if (query.isEmpty) {
-        _filteredCategories = _categories;
-      } else {
-        _filteredCategories = _categories
-            .where((c) => c.name.toLowerCase().contains(query))
-            .toList();
-      }
+      _filteredCategories = query.isEmpty
+          ? _categories
+          : _categories
+              .where((c) => c.name.toLowerCase().contains(query))
+              .toList();
+    });
+  }
+
+  void _addCategory(String name) {
+    setState(() {
+      _categories.add(
+        Category(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          name: name,
+          totalItems: 0,
+        ),
+      );
+      _filterCategories();
+    });
+  }
+
+  void _editCategory(Category category, String name) {
+    setState(() {
+      category.name = name;
+      _filterCategories();
+    });
+  }
+
+  void _deleteCategory(Category category) {
+    setState(() {
+      _categories.remove(category);
+      _filterCategories();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Kategori Alat'),
-      drawer: SideMenu(role: 'admin'),
-
+      drawer: const SideMenu(role: 'admin'),
       body: ListView(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(12),
         children: [
-          // SEARCH FIELD
+          // ===== SEARCH BAR =====
           TextField(
             controller: _searchController,
-            onChanged: (value) => _filterCategories(),
-            decoration: const InputDecoration(
-              labelText: 'Search kategori',
-              prefixIcon: Icon(Icons.search),
-              border: OutlineInputBorder(),
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          // TOMBOL TAMBAH DI BAWAH SEARCH
-          Align(
-            alignment: Alignment.centerRight,
-            child: ElevatedButton.icon(
-              onPressed: () => _openForm(),
-              icon: const Icon(Icons.add),
-              label: const Text('Tambah Kategori'),
-              style: ElevatedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+            onChanged: (_) => _filterCategories(),
+            decoration: InputDecoration(
+              labelText: 'Cari kategori',
+              prefixIcon: Icon(Icons.search, color: theme.colorScheme.primary),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.primary.withOpacity(0.4),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.primary.withOpacity(0.4),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.primary,
+                  width: 1.5,
+                ),
               ),
             ),
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-          // TABLE
+          // ===== ADD BUTTON =====
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('Tambah Kategori'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(50),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
+              ),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => AddCategoryDialog(
+                    onSubmit: _addCategory,
+                  ),
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // ===== DATA TABLE CARD =====
           Card(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columnSpacing: 20,
-                columns: const [
-                  DataColumn(label: Text('Nama')),
-                  DataColumn(label: Text('Jumlah Alat')),
-
-                  DataColumn(
-                    label: SizedBox(
-                      width: 140,
-                      child: Center(child: Text('Aksi')),
+            color: theme.colorScheme.background,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Daftar Kategori',
+                    style: theme.textTheme.titleMedium!.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ],
-                rows: _filteredCategories.map((category) {
-                  return DataRow(
-                    cells: [
-                      DataCell(Text(category.name)),
-                      DataCell(Text('${category.totalItems} alat')),
 
-                      DataCell(
-                        SizedBox(
-                          width: 140,
-                          child: Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                IconButton(
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  icon: const Icon(Icons.edit, size: 20),
-                                  onPressed: () => _openForm(category: category),
-                                ),
-                                const SizedBox(width: 4),
-                                IconButton(
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  icon: const Icon(Icons.delete, size: 20, color: Colors.red),
-                                  onPressed: () => _deleteCategory(category),
-                                ),
-                              ],
+                  const SizedBox(height: 12),
+
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      columnSpacing: 30,
+                      headingRowColor: MaterialStateProperty.all(
+                        theme.colorScheme.background,
+                      ),
+                      columns: [
+                        DataColumn(
+                          label: Text(
+                            'Nama',
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ),
+                        DataColumn(
+                          label: Text(
+                            'Jumlah Alat',
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ),
+                        DataColumn(
+                          label: Center(
+                            child: Text(
+                              'Aksi',
+                              style: theme.textTheme.bodyMedium,
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  );
-                }).toList(),
+                      ],
+                      rows: _filteredCategories.map((category) {
+                        return DataRow(
+                          cells: [
+                            DataCell(
+                              Text(
+                                category.name,
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                            ),
+                            DataCell(
+                              Text(
+                                '${category.totalItems} alat',
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                            ),
+                            DataCell(
+                              Center(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.edit,
+                                        size: 18,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                      onPressed: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (_) => EditCategoryDialog(
+                                            initialName: category.name,
+                                            onSubmit: (name) =>
+                                                _editCategory(category, name),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.delete,
+                                        size: 18,
+                                        color: theme.colorScheme.error,
+                                      ),
+                                      onPressed: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (_) => DeleteCategoryDialog(
+                                            categoryName: category.name,
+                                            onDelete: () =>
+                                                _deleteCategory(category),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
