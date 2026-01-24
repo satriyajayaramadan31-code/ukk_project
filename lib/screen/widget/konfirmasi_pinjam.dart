@@ -58,8 +58,7 @@ class KonfirmasiPinjamDialog extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       backgroundColor: theme.scaffoldBackgroundColor,
-      child: Container(
-        width: double.infinity,
+      child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -94,13 +93,13 @@ class KonfirmasiPinjamDialog extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: _statusColor(request.status), // kotak solid
+                color: _statusColor(request.status),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 _statusText(request.status),
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.white, // teks putih
+                  color: Colors.white,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -116,16 +115,49 @@ class KonfirmasiPinjamDialog extends StatelessWidget {
             const SizedBox(height: 10),
 
             // Tanggal
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Tanggal Pinjam", style: theme.textTheme.bodySmall),
+                const SizedBox(height: 4),
+                Text(
+                  _formatDate(request.borrowDate),
+                  style: theme.textTheme.bodyMedium,
+                ),
+
+                const SizedBox(height: 8),
+
+                Text("Tanggal Kembali", style: theme.textTheme.bodySmall),
+                const SizedBox(height: 4),
+                Text(
+                  _formatDate(request.dueDate),
+                  style: theme.textTheme.bodyMedium,
+                ),
+
+                const SizedBox(height: 8),
+
+                Text("Dikembalikan", style: theme.textTheme.bodySmall),
+                const SizedBox(height: 4),
+                Text(
+                  _formatDate(request.returnDate),
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+
+            // Keterlambatan & Kondisi
             Row(
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("Tanggal Pinjam", style: theme.textTheme.bodySmall),
+                      Text("Keterlambatan",
+                          style: theme.textTheme.bodySmall),
                       const SizedBox(height: 4),
-                      Text(_formatDate(request.borrowDate),
-                          style: theme.textTheme.bodyMedium),
+                      Text("0 hari", style: theme.textTheme.bodyMedium),
                     ],
                   ),
                 ),
@@ -133,10 +165,10 @@ class KonfirmasiPinjamDialog extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("Jatuh Tempo", style: theme.textTheme.bodySmall),
+                      Text("Kondisi Alat",
+                          style: theme.textTheme.bodySmall),
                       const SizedBox(height: 4),
-                      Text(_formatDate(request.dueDate),
-                          style: theme.textTheme.bodyMedium),
+                      Text("Rusak", style: theme.textTheme.bodyMedium),
                     ],
                   ),
                 ),
@@ -152,8 +184,8 @@ class KonfirmasiPinjamDialog extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(12),
+                color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Text(request.purpose),
             ),
@@ -168,24 +200,27 @@ class KonfirmasiPinjamDialog extends StatelessWidget {
                     onPressed: onConfirm,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: theme.colorScheme.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     child: const Text("Dikembalikan"),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: OutlinedButton(
+                  child: ElevatedButton(
                     onPressed: onReject,
-                    style: OutlinedButton.styleFrom(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
                       foregroundColor: theme.colorScheme.primary,
-                      side: BorderSide(color: theme.colorScheme.primary),
+                      elevation: 0,
+                      side: const BorderSide(color: Color(0xFF374151)),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    child: const Text("Tolak (Kembali ke Dipinjam)"),
+                    child: const Text("Tolak"),
                   ),
                 ),
               ],
-            )
+            ),
           ],
         ),
       ),

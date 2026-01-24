@@ -12,6 +12,7 @@ class LoanRequest {
   final String equipmentName;
   final String borrowDate;
   final String dueDate;
+  final String returnDate;
   final String purpose;
   LoanStatus status;
 
@@ -21,6 +22,7 @@ class LoanRequest {
     required this.equipmentName,
     required this.borrowDate,
     required this.dueDate,
+    required this.returnDate,
     required this.purpose,
     required this.status,
   });

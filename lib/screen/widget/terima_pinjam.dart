@@ -58,8 +58,7 @@ class TerimaPinjamDialog extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       backgroundColor: theme.scaffoldBackgroundColor,
-      child: Container(
-        width: double.infinity,
+      child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -94,13 +93,13 @@ class TerimaPinjamDialog extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: _statusColor(request.status), // solid color
+                color: _statusColor(request.status),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 _statusText(request.status),
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.white, // teks putih
+                  color: Colors.white,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -122,10 +121,13 @@ class TerimaPinjamDialog extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("Tanggal Pinjam", style: theme.textTheme.bodySmall),
+                      Text("Tanggal Pinjam",
+                          style: theme.textTheme.bodySmall),
                       const SizedBox(height: 4),
-                      Text(_formatDate(request.borrowDate),
-                          style: theme.textTheme.bodyMedium),
+                      Text(
+                        _formatDate(request.borrowDate),
+                        style: theme.textTheme.bodyMedium,
+                      ),
                     ],
                   ),
                 ),
@@ -133,10 +135,13 @@ class TerimaPinjamDialog extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("Jatuh Tempo", style: theme.textTheme.bodySmall),
+                      Text("Jatuh Tempo",
+                          style: theme.textTheme.bodySmall),
                       const SizedBox(height: 4),
-                      Text(_formatDate(request.dueDate),
-                          style: theme.textTheme.bodyMedium),
+                      Text(
+                        _formatDate(request.dueDate),
+                        style: theme.textTheme.bodyMedium,
+                      ),
                     ],
                   ),
                 ),
@@ -168,27 +173,35 @@ class TerimaPinjamDialog extends StatelessWidget {
                     onPressed: onApprove,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: theme.colorScheme.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
                     ),
                     child: const Text("Setujui"),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: OutlinedButton(
+                  child: ElevatedButton(
                     onPressed: onReject,
-                    style: OutlinedButton.styleFrom(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
                       foregroundColor: theme.colorScheme.primary,
-                      side: BorderSide(color: theme.colorScheme.primary),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(5),
-                      ),
+                      elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        side: BorderSide(
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
                     ),
                     child: const Text("Tolak"),
                   ),
                 ),
               ],
-            )
+            ),
           ],
         ),
       ),

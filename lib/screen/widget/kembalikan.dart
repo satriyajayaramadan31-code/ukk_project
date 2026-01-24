@@ -18,7 +18,6 @@ class KembalikanDialog extends StatefulWidget {
 
 class _KembalikanDialogState extends State<KembalikanDialog> {
   bool isBroken = false;
-  final TextEditingController brokenNoteController = TextEditingController();
 
   int _calculateLateDays(String dueDate) {
     final today = DateTime.now();
@@ -29,9 +28,7 @@ class _KembalikanDialogState extends State<KembalikanDialog> {
     return diff > 0 ? diff : 0;
   }
 
-  int _calculateFine(int lateDays) {
-    return lateDays * 10000; // Rp 10.000 per hari
-  }
+  int _calculateFine(int lateDays) => lateDays * 10000;
 
   String _formatDate(String dateString) {
     final date = DateTime.tryParse(dateString);
@@ -39,149 +36,121 @@ class _KembalikanDialogState extends State<KembalikanDialog> {
     return DateFormat.yMMMMd('id').format(date);
   }
 
+  String _formatCurrency(int amount) {
+    return NumberFormat.currency(
+      locale: "id_ID",
+      symbol: "Rp ",
+      decimalDigits: 0,
+    ).format(amount);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
     final lateDays = _calculateLateDays(widget.request.dueDate);
     final fine = _calculateFine(lateDays);
     final isLate = lateDays > 0;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24),
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            /// ===== TITLE =====
             Center(
               child: Text(
                 "Konfirmasi Pengembalian",
-                style: Theme.of(context).textTheme.headlineSmall,
+                style: theme.textTheme.headlineSmall,
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // ===== INFO ALAT =====
+            /// ===== INFO ALAT =====
+            Text("Nama Alat", style: theme.textTheme.bodySmall),
+            const SizedBox(height: 4),
+            Text(
+              widget.request.equipmentName,
+              style: theme.textTheme.bodyMedium,
+            ),
+
+            const SizedBox(height: 12),
+
+            _infoRow("Tanggal Pinjam",
+                _formatDate(widget.request.borrowDate)),
+            _infoRow("Tanggal Kembali",
+                _formatDate(widget.request.dueDate)),
+            _infoRow("Dikembalikan",
+                _formatDate(DateTime.now().toString())),
+            _infoRow(
+              "Keterlambatan",
+              "$lateDays hari",
+              valueColor: isLate ? scheme.error : null,
+            ),
+            _infoRow(
+              "Denda",
+              _formatCurrency(fine),
+              valueColor: isLate ? scheme.error : null,
+            ),
+
+            const SizedBox(height: 16),
+
+            /// ===== KONDISI ALAT =====
+            Text("Apakah alat rusak?",
+                style: theme.textTheme.bodySmall),
+            const SizedBox(height: 8),
+
             Row(
               children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    color: Colors.grey[200],
+                Expanded(
+                  child: _SelectBox(
+                    label: "Tidak",
+                    selected: !isBroken,
+                    onTap: () => setState(() => isBroken = false),
                   ),
-                  child: const Icon(Icons.devices, size: 34),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.request.equipmentName,
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Dipinjam: ${_formatDate(widget.request.borrowDate)}",
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
+                  child: _SelectBox(
+                    label: "Ya",
+                    selected: isBroken,
+                    onTap: () => setState(() => isBroken = true),
                   ),
                 ),
               ],
             ),
 
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
 
-            // ===== DETAIL =====
-            _infoRow("Jatuh Tempo", _formatDate(widget.request.dueDate)),
-            const Divider(),
-
-            _infoRow(
-              "Tanggal Pengembalian",
-              _formatDate(DateTime.now().toString()),
-            ),
-            const Divider(),
-
-            _infoRow(
-              "Hari Keterlambatan",
-              "$lateDays hari",
-              valueColor: isLate ? Colors.red : null,
-            ),
-            const Divider(),
-
-            _infoRow(
-              "Denda",
-              "Rp ${fine.toString()}",
-              valueColor: isLate ? Colors.red : null,
-            ),
-
-            const SizedBox(height: 14),
-
-            // ===== RUSAK YA/TIDAK =====
-            Text("Apakah alat rusak?", style: Theme.of(context).textTheme.bodySmall),
-            Row(
-              children: [
-                Radio<bool>(
-                  value: false,
-                  groupValue: isBroken,
-                  onChanged: (v) => setState(() => isBroken = v!),
-                ),
-                const Text("Tidak"),
-                Radio<bool>(
-                  value: true,
-                  groupValue: isBroken,
-                  onChanged: (v) => setState(() => isBroken = v!),
-                ),
-                const Text("Ya"),
-              ],
-            ),
-
-            if (isBroken) ...[
-              const SizedBox(height: 8),
-              Text("Keterangan kerusakan", style: Theme.of(context).textTheme.bodySmall),
-              const SizedBox(height: 4),
-              TextField(
-                controller: brokenNoteController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: "Jelaskan kerusakan alat",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 14),
-
-            // ===== STATUS ALERT =====
+            /// ===== ALERT STATUS =====
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isLate ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
-                border: Border.all(
-                  color: isLate ? Colors.red.withOpacity(0.3) : Colors.green.withOpacity(0.3),
-                ),
-                borderRadius: BorderRadius.circular(10),
+                color: isLate
+                    ? scheme.error.withOpacity(0.08)
+                    : Colors.green.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
                   Icon(
                     isLate ? Icons.error : Icons.check_circle,
-                    color: isLate ? Colors.red : Colors.green,
+                    color: isLate ? scheme.error : Colors.green,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       isLate
-                          ? "Terlambat $lateDays hari. Denda ${_formatCurrency(fine)} akan dikenakan."
-                          : "Tepat waktu. Tidak ada denda keterlambatan.",
-                      style: Theme.of(context).textTheme.bodySmall,
+                          ? "Terlambat $lateDays hari. Denda ${_formatCurrency(fine)} dikenakan."
+                          : "Pengembalian tepat waktu. Tidak ada denda.",
+                      style: theme.textTheme.bodySmall,
                     ),
                   ),
                 ],
@@ -190,21 +159,16 @@ class _KembalikanDialogState extends State<KembalikanDialog> {
 
             const SizedBox(height: 18),
 
-            // ===== BUTTON =====
+            /// ===== BUTTON =====
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
-                      // disini kamu bisa kirim data rusak + keterangan ke backend
                       widget.onReturn();
                       Navigator.pop(context);
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    child: const Text("Konfirmasi Pengembalian"),
+                    child: const Text("Konfirmasi"),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -212,11 +176,12 @@ class _KembalikanDialogState extends State<KembalikanDialog> {
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(
-                        color: Theme.of(context).colorScheme.primary,
-                        width: 1.5,
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 14),
+                      side: BorderSide(color: scheme.primary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     child: const Text("Batal"),
                   ),
@@ -229,35 +194,70 @@ class _KembalikanDialogState extends State<KembalikanDialog> {
     );
   }
 
-  Widget _infoRow(String label, String value, {Color? valueColor}) {
+  Widget _infoRow(String label, String value,
+      {Color? valueColor}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(color: Colors.grey),
-            ),
+            child: Text(label, style: const TextStyle(color: Colors.grey)),
           ),
           Text(
             value,
             style: TextStyle(
-              color: valueColor ?? Colors.black,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
+              color: valueColor,
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  String _formatCurrency(int amount) {
-    final format = NumberFormat.currency(
-      locale: "id_ID",
-      symbol: "Rp ",
-      decimalDigits: 0,
+/// ===== SELECT BOX (YA / TIDAK) =====
+class _SelectBox extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SelectBox({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? scheme.primary : Colors.grey.shade300,
+            width: 1.5,
+          ),
+          color: selected
+              ? scheme.primary.withOpacity(0.08)
+              : Colors.transparent,
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: selected ? scheme.primary : scheme.onBackground,
+            ),
+          ),
+        ),
+      ),
     );
-    return format.format(amount);
   }
 }

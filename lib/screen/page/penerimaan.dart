@@ -27,6 +27,7 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
       equipmentName: "Laptop Dell XPS 15",
       borrowDate: "2026-01-10",
       dueDate: "2026-01-17",
+      returnDate: "2026-01-12",
       purpose: "Presentasi proyek akhir",
       status: LoanStatus.menunggu,
     ),
@@ -36,6 +37,7 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
       equipmentName: "Kamera DSLR Canon",
       borrowDate: "2026-01-11",
       dueDate: "2026-01-15",
+      returnDate: "2026-01-12",
       purpose: "Dokumentasi acara kampus",
       status: LoanStatus.menunggu,
     ),
@@ -45,8 +47,9 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
       equipmentName: "Proyektor Epson",
       borrowDate: "2026-01-09",
       dueDate: "2026-01-12",
+      returnDate: "2026-01-12",
       purpose: "Seminar departemen",
-      status: LoanStatus.dipinjam,
+      status: LoanStatus.diproses,
     ),
     LoanRequest(
       id: "4",
@@ -54,6 +57,7 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
       equipmentName: "Mikrofon Wireless",
       borrowDate: "2026-01-08",
       dueDate: "2026-01-10",
+      returnDate: "2026-01-12",
       purpose: "Podcast mahasiswa",
       status: LoanStatus.ditolak,
     ),
@@ -274,7 +278,8 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
                         DataColumn(label: Text('Peminjam')),
                         DataColumn(label: Text('Nama Alat')),
                         DataColumn(label: Text('Tgl Pinjam')),
-                        DataColumn(label: Text('Jatuh Tempo')),
+                        DataColumn(label: Text('Tgl Kembali')),
+                        DataColumn(label: Text('Dikembalikan')),
                         DataColumn(label: Text('Status')),
                         DataColumn(label: Center(child: Text('Aksi'))),
                       ],
@@ -285,6 +290,7 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
                             DataCell(Text(r.equipmentName)),
                             DataCell(Text(_formatDate(r.borrowDate))),
                             DataCell(Text(_formatDate(r.dueDate))),
+                            DataCell(Text(_formatDate(r.returnDate))),
                             DataCell(
                               Container(
                                 padding: const EdgeInsets.symmetric(
