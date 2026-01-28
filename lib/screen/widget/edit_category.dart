@@ -92,7 +92,7 @@ class _EditCategoryDialogState extends State<EditCategoryDialog> {
     final theme = Theme.of(context);
 
     return AlertDialog(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(6),
       ),

@@ -4,9 +4,10 @@ import '../widget/side_menu.dart';
 import '../widget/add_user.dart';
 import '../widget/edit_user.dart';
 import '../widget/delete_user.dart';
+import 'package:engine_rent_app/service/supabase_service.dart';
 
 class User {
-  final String id;
+  final int id;
   String username;
   String role;
   String password;
@@ -27,19 +28,30 @@ class UserPage extends StatefulWidget {
 }
 
 class _UserPageState extends State<UserPage> {
-  final List<User> _users = [
-    User(id: '1', username: 'admin', role: 'admin', password: 'admin123'),
-    User(id: '2', username: 'petugas', role: 'petugas', password: 'petugas123'),
-    User(id: '3', username: 'peminjam', role: 'peminjam', password: 'user123'),
-  ];
+  List<User> _users = [];
+  List<User> _filteredUsers = [];
 
   final TextEditingController _searchController = TextEditingController();
-  List<User> _filteredUsers = [];
 
   @override
   void initState() {
     super.initState();
-    _filteredUsers = _users;
+    _fetchUsers();
+  }
+
+  Future<void> _fetchUsers() async {
+    final res = await SupabaseService.getUsers();
+    setState(() {
+      _users = res
+          .map((e) => User(
+                id: e['id'],
+                username: e['username'],
+                role: e['role'],
+                password: e['password'],
+              ))
+          .toList();
+      _filteredUsers = _users;
+    });
   }
 
   void _filterUsers() {
@@ -53,34 +65,30 @@ class _UserPageState extends State<UserPage> {
     });
   }
 
-  void _addUser(String username, String role, String password) {
-    setState(() {
-      _users.add(
-        User(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          username: username,
-          role: role,
-          password: password,
-        ),
-      );
-      _filterUsers();
-    });
+  Future<void> _addUser(String username, String role, String password) async {
+    final success = await SupabaseService.addUser(
+      username: username,
+      password: password,
+      role: role,
+    );
+
+    if (success) _fetchUsers();
   }
 
-  void _editUser(User user, String username, String role, String password) {
-    setState(() {
-      user.username = username;
-      user.role = role;
-      user.password = password;
-      _filterUsers();
-    });
+  Future<void> _editUser(User user, String username, String role, String password) async {
+    final success = await SupabaseService.editUser(
+      id: user.id,
+      username: username,
+      password: password,
+      role: role,
+    );
+
+    if (success) _fetchUsers();
   }
 
-  void _deleteUser(User user) {
-    setState(() {
-      _users.remove(user);
-      _filterUsers();
-    });
+  Future<void> _deleteUser(User user) async {
+    final success = await SupabaseService.deleteUser(id: user.id);
+    if (success) _fetchUsers();
   }
 
   @override
@@ -88,11 +96,13 @@ class _UserPageState extends State<UserPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: theme.colorScheme.background,
       appBar: const AppBarWithMenu(title: 'Manajemen User'),
-      drawer: const SideMenu(role: 'admin'),
+      drawer: const SideMenu(),
       body: ListView(
         padding: const EdgeInsets.all(10),
         children: [
+          // Search
           TextField(
             controller: _searchController,
             onChanged: (_) => _filterUsers(),
@@ -108,6 +118,7 @@ class _UserPageState extends State<UserPage> {
 
           const SizedBox(height: 10),
 
+          // Add Button
           Align(
             alignment: Alignment.centerRight,
             child: ElevatedButton.icon(
@@ -134,6 +145,7 @@ class _UserPageState extends State<UserPage> {
 
           const SizedBox(height: 10),
 
+          // Users Table
           Card(
             color: theme.scaffoldBackgroundColor,
             child: Padding(
@@ -146,7 +158,6 @@ class _UserPageState extends State<UserPage> {
                     style: theme.textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 10),
-
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: DataTable(
@@ -169,12 +180,9 @@ class _UserPageState extends State<UserPage> {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    // EDIT
+                                    // Edit
                                     IconButton(
-                                      icon: const Icon(
-                                        Icons.edit,
-                                        size: 18,
-                                      ),
+                                      icon: const Icon(Icons.edit, size: 18),
                                       onPressed: () {
                                         showDialog(
                                           context: context,
@@ -186,16 +194,10 @@ class _UserPageState extends State<UserPage> {
                                         );
                                       },
                                     ),
-
                                     const SizedBox(width: 8),
-
-                                    // DELETE
+                                    // Delete
                                     IconButton(
-                                      icon: const Icon(
-                                        Icons.delete,
-                                        size: 18,
-                                        color: Colors.red,
-                                      ),
+                                      icon: const Icon(Icons.delete, size: 18, color: Colors.red),
                                       onPressed: () {
                                         showDialog(
                                           context: context,

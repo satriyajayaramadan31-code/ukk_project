@@ -180,7 +180,7 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
 
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Persetujuan Peminjaman'),
-      drawer: const SideMenu(role: 'petugas'),
+      drawer: const SideMenu(),
       body: ListView(
         padding: const EdgeInsets.all(14),
         children: [
@@ -272,7 +272,7 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
                     scrollDirection: Axis.horizontal,
                     child: DataTable(
                       columnSpacing: 28,
-                      headingRowColor: MaterialStatePropertyAll(
+                      headingRowColor: WidgetStatePropertyAll(
                           theme.scaffoldBackgroundColor),
                       columns: const [
                         DataColumn(label: Text('Peminjam')),

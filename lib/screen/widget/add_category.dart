@@ -84,7 +84,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
     final theme = Theme.of(context);
 
     return AlertDialog(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(6),
       ),

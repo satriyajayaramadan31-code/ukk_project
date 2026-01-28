@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../utils/theme.dart';
 
-class DeleteUserDialog extends StatelessWidget {
+class DeleteUserDialog extends StatefulWidget {
   final String username;
   final VoidCallback onDelete;
 
@@ -11,12 +11,19 @@ class DeleteUserDialog extends StatelessWidget {
     required this.onDelete,
   });
 
-  void _showPopup({
-    required BuildContext context,
+  @override
+  State<DeleteUserDialog> createState() => _DeleteUserDialogState();
+}
+
+class _DeleteUserDialogState extends State<DeleteUserDialog> {
+  // ================= SAFE POPUP =================
+  Future<void> _showPopup({
     required IconData icon,
     required String text,
     required Color color,
-  }) {
+  }) async {
+    if (!mounted) return;
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -34,15 +41,13 @@ class DeleteUserDialog extends StatelessWidget {
                   alignment: Alignment.topRight,
                   child: IconButton(
                     icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      if (Navigator.canPop(context)) Navigator.pop(context);
+                    },
                   ),
                 ),
                 const SizedBox(height: 12),
-                Icon(
-                  icon,
-                  size: 72,
-                  color: color,
-                ),
+                Icon(icon, size: 72, color: color),
                 const SizedBox(height: 16),
                 Text(
                   text,
@@ -57,10 +62,10 @@ class DeleteUserDialog extends StatelessWidget {
       },
     );
 
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!Navigator.canPop(context)) return;
-      Navigator.pop(context);
-    });
+    // Delay popup close safely
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    if (Navigator.canPop(context)) Navigator.pop(context);
   }
 
   @override
@@ -82,7 +87,7 @@ class DeleteUserDialog extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              'Yakin ingin menghapus user "$username"?',
+              'Yakin ingin menghapus user "${widget.username}"?',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium,
             ),
@@ -101,12 +106,12 @@ class DeleteUserDialog extends StatelessWidget {
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      onDelete();
+                    onPressed: () async {
+                      Navigator.pop(context); // tutup dialog utama
+                      widget.onDelete(); // jalankan delete logic
 
-                      _showPopup(
-                        context: context,
+                      // tampilkan popup sukses
+                      await _showPopup(
                         icon: Icons.check_circle,
                         text: 'User Berhasil\nDihapus',
                         color: Colors.green,
@@ -137,7 +142,9 @@ class DeleteUserDialog extends StatelessWidget {
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      if (Navigator.canPop(context)) Navigator.pop(context);
+                    },
                     child: const Text(
                       'Batal',
                       style: TextStyle(

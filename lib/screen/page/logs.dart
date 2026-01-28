@@ -103,7 +103,8 @@ class _LogsPageState extends State<LogsPage> {
 
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Log Aktivitas'),
-      drawer: const SideMenu(role: 'admin'),
+      backgroundColor: theme.colorScheme.background,
+      drawer: const SideMenu(),
       body: ListView(
         padding: const EdgeInsets.all(14),
         children: [
@@ -131,14 +132,14 @@ class _LogsPageState extends State<LogsPage> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            color: theme.colorScheme.background,
+            color: theme.colorScheme.surface,
             elevation: 2,
             child: Padding(
               padding: const EdgeInsets.all(14),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: DataTable(
-                  headingRowColor: MaterialStateProperty.all(theme.scaffoldBackgroundColor),
+                  headingRowColor: WidgetStateProperty.all(theme.scaffoldBackgroundColor),
                   columns: const [
                     DataColumn(label: Text('Username')),
                     DataColumn(label: Text('Deskripsi')),

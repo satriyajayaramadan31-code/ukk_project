@@ -114,7 +114,7 @@ class _AlatPageState extends State<AlatPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Daftar Alat'),
-      drawer: const SideMenu(role: 'peminjam'),
+      drawer: const SideMenu(),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

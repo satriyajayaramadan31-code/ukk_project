@@ -172,7 +172,7 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24),
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -315,7 +315,7 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
 
   Widget _statusDropdown(BuildContext context) {
     return DropdownButtonFormField<LoanStatus>(
-      value: status,
+      initialValue: status,
       decoration: InputDecoration(
         border: _border(context),
         enabledBorder: _border(context),

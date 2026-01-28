@@ -1,15 +1,64 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+class Category {
+  final String id;
+  final String name;
+  final int totalItems;
+
+  Category({required this.id, required this.name, this.totalItems = 0});
+}
+
+class Alat {
+  final String id;
+  final String namaAlat;
+  final String fotoUrl;
+  final String status;
+  final String kategoriId; // FK ke tabel kategori_alat
+  final String kategoriNama; // Untuk UI
+  final int denda;
+  final int perbaikan;
+
+  final Uint8List? bytes;
+
+  Alat({
+    required this.id,
+    required this.namaAlat,
+    required this.fotoUrl,
+    required this.status,
+    required this.kategoriId,
+    required this.kategoriNama,
+    required this.denda,
+    required this.perbaikan,
+    this.bytes
+  });
+
+  factory Alat.fromMap(Map<String, dynamic> json) {
+    return Alat(
+      id: json['id'].toString(),
+      namaAlat: json['nama_alat'] ?? '',
+      fotoUrl: json['foto_url'] ?? '',
+      status: json['status'] ?? 'Tersedia',
+      kategoriId: json['kategori'].toString(),
+      kategoriNama: json['kategori_alat'] != null
+          ? json['kategori_alat']['kategori'] ?? ''
+          : '',
+      denda: json['denda'] ?? 0,
+      perbaikan: json['perbaikan'] ?? 0,
+    );
+  }
+}
+
 
 class SupabaseService {
   static final SupabaseClient _client = Supabase.instance.client;
   static const _tokenKey = 'auth_token';
 
   // ================= TOKEN HANDLER =================
-
   static Future<void> _writeToken(String token) async {
     if (kIsWeb) {
       final prefs = await SharedPreferences.getInstance();
@@ -57,7 +106,6 @@ class SupabaseService {
   }
 
   // ================= LOGIN =================
-
   static Future<Map<String, dynamic>> login({
     required String username,
     required String password,
@@ -73,16 +121,14 @@ class SupabaseService {
 
       debugPrint('🟢 DB RESULT: $user');
 
-      if (user == null) {
-        return {'success': false, 'message': 'Username salah'};
-      }
+      if (user == null) return {'success': false, 'message': 'Username salah'};
 
-      if (user['password'] != password) {
+      if ((user['password'] ?? '').toString() != password) {
         return {'success': false, 'message': 'Password salah'};
       }
 
       await _deleteToken();
-      await _writeToken(user['token']);
+      await _writeToken((user['token'] ?? '').toString());
 
       debugPrint('✅ LOGIN BERHASIL');
 
@@ -106,17 +152,13 @@ class SupabaseService {
   }
 
   // ================= AUTH CHECK =================
-
   static Future<bool> isLoggedIn() async {
     try {
       final token = await _readToken();
       if (token == null) return false;
 
-      final user = await _client
-          .from('user')
-          .select('id')
-          .eq('token', token)
-          .maybeSingle();
+      final user =
+          await _client.from('user').select('id').eq('token', token).maybeSingle();
 
       debugPrint('🔍 AUTH CHECK: $user');
       return user != null;
@@ -131,11 +173,8 @@ class SupabaseService {
       final token = await _readToken();
       if (token == null) return null;
 
-      final user = await _client
-          .from('user')
-          .select('role')
-          .eq('token', token)
-          .maybeSingle();
+      final user =
+          await _client.from('user').select('role').eq('token', token).maybeSingle();
 
       return user?['role'];
     } catch (e) {
@@ -143,8 +182,6 @@ class SupabaseService {
       return null;
     }
   }
-
-  // ================= GET USERNAME =================
 
   static Future<String?> getUsername() async {
     try {
@@ -164,8 +201,331 @@ class SupabaseService {
     }
   }
 
-  // ================= LOGOUT =================
+  static Future<int?> getUserId() async {
+    try {
+      final token = await _readToken();
+      if (token == null) return null;
 
+      final user =
+          await _client.from('user').select('id').eq('token', token).maybeSingle();
+
+      final id = user?['id'];
+      if (id == null) return null;
+
+      return (id is int) ? id : int.tryParse(id.toString());
+    } catch (e) {
+      debugPrint('❌ GET USER ID ERROR: $e');
+      return null;
+    }
+  }
+
+  // ================= DASHBOARD =================
+  static Future<int> _countLoansByStatus({
+    required String status,
+    required String role,
+    required int? userId,
+  }) async {
+    try {
+      PostgrestFilterBuilder q =
+          _client.from('peminjaman').select('id').eq('status', status);
+
+      if (role == 'Peminjam' && userId != null) q = q.eq('user', userId);
+
+      final res = await q;
+      return (res as List).length;
+    } catch (e) {
+      debugPrint('❌ COUNT LOANS ERROR ($status): $e');
+      return 0;
+    }
+  }
+
+  static Future<int> _countOverdueByColumn({
+    required String role,
+    required int? userId,
+  }) async {
+    try {
+      PostgrestFilterBuilder q =
+          _client.from('peminjaman').select('id').neq('terlambat', 0);
+
+      if (role == 'Peminjam' && userId != null) q = q.eq('user', userId);
+
+      final res = await q;
+      return (res as List).length;
+    } catch (e) {
+      debugPrint('❌ COUNT OVERDUE ERROR (terlambat column): $e');
+      return 0;
+    }
+  }
+
+  static Future<Map<String, int>> getDashboardStats({required String role}) async {
+    try {
+      final userId = await getUserId();
+
+      final totalEquipmentRes = await _client.from('alat').select('id');
+      final totalEquipment = (totalEquipmentRes as List).length;
+
+      final activeLoans = await _countLoansByStatus(
+          status: 'dipinjam', role: role, userId: userId);
+      final pendingApprovals = await _countLoansByStatus(
+          status: 'menunggu', role: role, userId: userId);
+      final overdueReturns = await _countOverdueByColumn(role: role, userId: userId);
+
+      return {
+        'totalEquipment': totalEquipment,
+        'activeLoans': activeLoans,
+        'pendingApprovals': pendingApprovals,
+        'overdueReturns': overdueReturns,
+      };
+    } catch (e) {
+      debugPrint('❌ DASHBOARD STATS ERROR: $e');
+      return {'totalEquipment': 0, 'activeLoans': 0, 'pendingApprovals': 0, 'overdueReturns': 0};
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getDashboardActivities(
+      {required String role, int limit = 5}) async {
+    try {
+      final userId = await getUserId();
+
+      PostgrestFilterBuilder baseQuery = _client.from('peminjaman').select('''
+        id,
+        status,
+        created_at,
+        tanggal_pinjam,
+        tanggal_kembali,
+        tanggal_pengembalian,
+        alasan,
+        terlambat,
+        alat ( nama_alat ),
+        user:user ( username )
+      ''');
+
+      if (role == 'Peminjam' && userId != null) baseQuery = baseQuery.eq('user', userId);
+
+      final data = await baseQuery.order('created_at', ascending: false).limit(limit);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('❌ DASHBOARD ACTIVITIES ERROR: $e');
+      return [];
+    }
+  }
+
+  static String timeAgo(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+
+    if (diff.inMinutes < 1) return 'baru saja';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} menit lalu';
+    if (diff.inHours < 24) return '${diff.inHours} jam lalu';
+    return '${diff.inDays} hari lalu';
+  }
+
+  // ================= USER MANAGEMENT =================
+  static Future<List<Map<String, dynamic>>> getUsers() async {
+    try {
+      final res = await _client.from('user').select('*').order('username');
+      return List<Map<String, dynamic>>.from(res);
+    } catch (e) {
+      debugPrint('❌ GET USERS ERROR: $e');
+      return [];
+    }
+  }
+
+  static Future<bool> addUser(
+      {required String username, required String password, required String role}) async {
+    try {
+      await _client.from('user').insert({
+        'username': username,
+        'password': password,
+        'role': role,
+      });
+      debugPrint('✅ ADD USER SUCCESS');
+      return true;
+    } catch (e) {
+      debugPrint('❌ ADD USER ERROR: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> editUser(
+      {required int id, required String username, required String password, required String role}) async {
+    try {
+      await _client.from('user').update({
+        'username': username,
+        'password': password,
+        'role': role,
+      }).eq('id', id);
+      debugPrint('✅ EDIT USER SUCCESS');
+      return true;
+    } catch (e) {
+      debugPrint('❌ EDIT USER ERROR: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> deleteUser({required int id}) async {
+    try {
+      await _client.from('user').delete().eq('id', id);
+      debugPrint('✅ DELETE USER SUCCESS');
+      return true;
+    } catch (e) {
+      debugPrint('❌ DELETE USER ERROR: $e');
+      return false;
+    }
+  }
+
+  // ================= CATEGORY MANAGEMENT =================
+  Future<List<Category>> getCategories() async {
+    final response = await _client.from('kategori_alat').select().order('id', ascending: true);
+
+    final data = response as List<dynamic>;
+    return data.map((e) {
+      return Category(
+        id: e['id'].toString(),
+        name: e['kategori'] ?? '',
+      );
+    }).toList();
+  }
+
+  Future<Category> addCategory(String name) async {
+    final response = await _client.from('kategori_alat').insert({'kategori': name}).select().single();
+    final data = response;
+    return Category(
+      id: data['id'].toString(),
+      name: data['kategori'],
+    );
+  }
+
+  Future<Category> editCategory(String id, String name) async {
+    final response = await _client
+        .from('kategori_alat')
+        .update({'kategori': name})
+        .eq('id', id)
+        .select()
+        .single();
+    final data = response;
+    return Category(
+      id: data['id'].toString(),
+      name: data['kategori'],
+    );
+  }
+
+  Future<void> deleteCategory(String id) async {
+    await _client.from('kategori_alat').delete().eq('id', id);
+  }
+
+  Future<int> countItemsInCategory(String categoryId) async {
+    // Ambil data dari tabel 'alat' sesuai kategori
+    final response = await _client
+        .from('alat')
+        .select('id') // cuma ambil kolom id
+        .eq('kategori', categoryId)
+        .limit(1000); // opsional, batasi jumlah jika banyak data
+
+    // response adalah List<dynamic>
+    final data = response as List<dynamic>? ?? [];
+    return data.length;
+  }
+
+
+  // ================= ALAT =================
+
+  static Future<String> uploadFoto(Uint8List bytes, String fileName) async {
+    final filePath = '$fileName.${DateTime.now().millisecondsSinceEpoch}.jpg';
+    try {
+      await _client.storage.from('Image').uploadBinary(filePath, bytes, fileOptions: const FileOptions(upsert: true));
+      return _client.storage.from('Image').getPublicUrl(filePath);
+    } catch (e) {
+      debugPrint('❌ Upload foto gagal: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteFoto(String url) async {
+    final parts = url.split('/');
+    final fileName = parts.last;
+    try {
+      await _client.storage.from('Image').remove(['$fileName']);
+    } catch (e) {
+      debugPrint('❌ Gagal hapus foto: $e');
+      throw e;
+    }
+  }
+
+  Future<List<Alat>> getAlat() async {
+    try {
+      // Ambil alat beserta kategori
+      final res = await _client
+          .from('alat')
+          .select('*, kategori_alat(*)')
+          .order('id', ascending: true);
+
+      final data = res as List<dynamic>;
+      return data.map((e) => Alat.fromMap(e)).toList();
+    } catch (e) {
+      debugPrint('❌ GET ALAT ERROR: $e');
+      return [];
+    }
+  }
+
+  Future<Alat> addAlat({
+    required String namaAlat,
+    required String status,
+    required String kategoriId,
+    required int denda,
+    required int perbaikan,
+    String fotoUrl = '',
+  }) async {
+    final res = await _client.from('alat').insert({
+      'nama_alat': namaAlat,
+      'status': status,
+      'kategori': kategoriId,
+      'denda': denda,
+      'perbaikan': perbaikan,
+      'foto_url': fotoUrl,
+    }).select().single();
+    return Alat.fromMap(res);
+  }
+
+Future<Alat> editAlat({
+  required String id,
+  required String namaAlat,
+  required String status,
+  required String kategoriId,
+  required String image,
+  required int denda,
+  required int perbaikan,
+}) async {
+  final res = await _client.from('alat').update({
+    'nama_alat': namaAlat,
+    'status': status,
+    'kategori': kategoriId,
+    'foto_url': image,
+    'denda': denda,
+    'perbaikan': perbaikan,
+  }).eq('id', id).select().single();
+
+  return Alat.fromMap(res);
+}
+
+Future<void> deleteAlat(String id, {String? fotoUrl}) async {
+  try {
+    // 1. Hapus foto jika ada
+    if (fotoUrl != null && fotoUrl.isNotEmpty) {
+      await deleteFoto(fotoUrl);
+    }
+
+    // 2. Hapus record alat di database
+    await _client.from('alat').delete().eq('id', id);
+
+    debugPrint('✅ Alat $id berhasil dihapus');
+  } catch (e) {
+    debugPrint('❌ Gagal hapus alat $id: $e');
+    throw e;
+  }
+}
+
+  // ================= LOGOUT =================
   static Future<void> logout() async {
     await _deleteToken();
     debugPrint('👋 LOGOUT');

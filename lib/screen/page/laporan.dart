@@ -106,7 +106,7 @@ class _LaporanPageState extends State<LaporanPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Laporan'),
-      drawer: const SideMenu(role: 'petugas'),
+      drawer: const SideMenu(),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(14),
@@ -152,7 +152,7 @@ class _LaporanPageState extends State<LaporanPage> {
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: reportType,
+                          initialValue: reportType,
                           decoration: const InputDecoration(
                             labelText: "Jenis Laporan",
                             border: OutlineInputBorder(),
@@ -177,7 +177,7 @@ class _LaporanPageState extends State<LaporanPage> {
                       const SizedBox(width: 14),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: timePeriod,
+                          initialValue: timePeriod,
                           decoration: const InputDecoration(
                             labelText: "Periode",
                             border: OutlineInputBorder(),

@@ -150,7 +150,7 @@ class _PeminjamanPageState extends State<PeminjamanPage> {
 
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Peminjaman Saya'),
-      drawer: const SideMenu(role: 'peminjam'),
+      drawer: const SideMenu(),
       body: ListView(
         padding: const EdgeInsets.all(14),
         children: [

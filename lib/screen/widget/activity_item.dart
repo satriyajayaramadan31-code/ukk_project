@@ -15,14 +15,44 @@ class ActivityItem extends StatelessWidget {
     this.isLast = false,
   });
 
+  /// Normalisasi status dari DB (misal: "menunggu" -> "Menunggu")
+  String get normalizedStatus {
+    final s = status.trim().toLowerCase();
+
+    switch (s) {
+      case 'menunggu':
+        return 'Menunggu';
+      case 'diproses':
+        return 'Diproses';
+      case 'dipinjam':
+        return 'Dipinjam';
+      case 'dikembalikan':
+        return 'Dikembalikan';
+      case 'terlambat':
+        return 'Terlambat';
+      case 'ditolak':
+        return 'Ditolak';
+      default:
+        // kapital huruf awal tiap kata
+        if (s.isEmpty) return '-';
+        return s[0].toUpperCase() + s.substring(1);
+    }
+  }
+
   Color getStatusColor() {
-    switch (status) {
+    switch (normalizedStatus) {
       case 'Menunggu':
         return AppTheme.statusPending;
+      case 'Diproses':
+        return AppTheme.statusConfirm; // boleh ganti AppTheme kalau ada
       case 'Dipinjam':
         return AppTheme.statusBorrowed;
       case 'Dikembalikan':
         return AppTheme.statusReturned;
+      case 'Terlambat':
+        return AppTheme.statusLate;
+      case 'Ditolak':
+        return AppTheme.statusLate; // pastikan ada di theme.dart
       default:
         return AppTheme.primary;
     }
@@ -36,35 +66,22 @@ class ActivityItem extends StatelessWidget {
       children: [
         Row(
           children: [
-            // BAGIAN KIRI
             Expanded(
               flex: 6,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 2),
-                  Text(
-                    item,
-                    style: theme.textTheme.bodyMedium,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+              child: Text(
+                item,
+                style: theme.textTheme.bodyMedium,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-
             const SizedBox(width: 12),
-
-            // BAGIAN KANAN
             Expanded(
               flex: 4,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: getStatusColor(),
                       borderRadius: BorderRadius.circular(20),
@@ -72,22 +89,18 @@ class ActivityItem extends StatelessWidget {
                     child: Text(
                       status,
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onPrimary,
+                        color: Colors.white,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    time,
-                    style: theme.textTheme.bodySmall,
-                  ),
+                  Text(time, style: theme.textTheme.bodySmall),
                 ],
               ),
             ),
           ],
         ),
-
         if (!isLast)
           Divider(
             height: 24,

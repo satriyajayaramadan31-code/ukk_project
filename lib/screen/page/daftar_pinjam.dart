@@ -137,7 +137,8 @@ class _DaftarPinjamState extends State<DaftarPinjam> {
 
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Daftar Peminjaman'),
-      drawer: const SideMenu(role: 'admin'),
+      backgroundColor: theme.colorScheme.background,
+      drawer: const SideMenu(),
       body: ListView(
         padding: const EdgeInsets.all(14),
         children: [
@@ -287,7 +288,7 @@ class _DaftarPinjamState extends State<DaftarPinjam> {
                     child: DataTable(
                       columnSpacing: 28,
                       headingRowColor:
-                          MaterialStatePropertyAll(theme.scaffoldBackgroundColor),
+                          WidgetStatePropertyAll(theme.scaffoldBackgroundColor),
                       columns: const [
                         DataColumn(label: Text('Peminjam')),
                         DataColumn(label: Text('Nama Alat')),

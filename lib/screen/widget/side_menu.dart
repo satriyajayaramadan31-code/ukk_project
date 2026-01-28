@@ -4,12 +4,7 @@ import 'package:engine_rent_app/service/navigation_service.dart';
 import 'package:engine_rent_app/service/supabase_service.dart';
 
 class SideMenu extends StatefulWidget {
-  final String role;
-
-  const SideMenu({
-    super.key,
-    required this.role,
-  });
+  const SideMenu({super.key});
 
   @override
   State<SideMenu> createState() => _SideMenuState();
@@ -17,18 +12,23 @@ class SideMenu extends StatefulWidget {
 
 class _SideMenuState extends State<SideMenu> {
   String username = "User";
+  String role = "peminjam"; // default sementara
 
   @override
   void initState() {
     super.initState();
-    _loadUsername();
+    _loadUserData();
   }
 
-  void _loadUsername() async {
+  /// Load username & role dari Supabase
+  void _loadUserData() async {
     final name = await SupabaseService.getUsername();
-    if (mounted && name != null) {
+    final r = await SupabaseService.getRole();
+
+    if (mounted) {
       setState(() {
-        username = name;
+        username = name ?? "User";
+        role = r ?? "peminjam";
       });
     }
   }
@@ -57,8 +57,6 @@ class _SideMenuState extends State<SideMenu> {
                           ?.copyWith(color: Colors.white),
                     ),
                   ),
-
-                  // Close icon di pojok kanan
                   IconButton(
                     icon: const Icon(Icons.close, color: Colors.white),
                     onPressed: () => Navigator.pop(context),
@@ -74,94 +72,38 @@ class _SideMenuState extends State<SideMenu> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 children: [
-                  _menuItem(
-                    context,
-                    icon: Icons.home,
-                    title: "Dashboard",
-                    keyValue: "dashboard",
-                  ),
+                  _menuItem(context, icon: Icons.home, title: "Dashboard", keyValue: "dashboard"),
 
-                  if (widget.role == "admin")
-                    _menuItem(
-                      context,
-                      icon: Icons.people,
-                      title: "User",
-                      keyValue: "user",
-                    ),
+                  if (role == "admin")
+                    _menuItem(context, icon: Icons.people, title: "User", keyValue: "user"),
 
-                  if (widget.role == "admin")
-                    _menuItem(
-                      context,
-                      icon: Icons.dashboard,
-                      title: "Kategori",
-                      keyValue: "kategori",
-                    ),
+                  if (role == "admin")
+                    _menuItem(context, icon: Icons.dashboard, title: "Kategori", keyValue: "kategori"),
 
-                  if (widget.role == "admin")
-                    _menuItem(
-                      context,
-                      icon: Icons.inventory_2,
-                      title: "Daftar Alat",
-                      keyValue: "daftaralat",
-                    ),
+                  if (role == "admin")
+                    _menuItem(context, icon: Icons.inventory_2, title: "Daftar Alat", keyValue: "daftaralat"),
 
-                  if (widget.role == "peminjam")
-                    _menuItem(
-                      context,
-                      icon: Icons.inventory_2,
-                      title: "Alat",
-                      keyValue: "alat",
-                    ),
+                  if (role == "peminjam")
+                    _menuItem(context, icon: Icons.inventory_2, title: "Alat", keyValue: "alat"),
 
-                  if (widget.role == "peminjam")
-                    _menuItem(
-                      context,
-                      icon: Icons.assignment,
-                      title: "Peminjaman",
-                      keyValue: "pinjam",
-                    ),
+                  if (role == "peminjam")
+                    _menuItem(context, icon: Icons.assignment, title: "Peminjaman", keyValue: "pinjam"),
 
-                  if (widget.role == "admin")
-                    _menuItem(
-                      context,
-                      icon: Icons.assignment,
-                      title: "Peminjaman",
-                      keyValue: "daftarpeminjaman",
-                    ),
+                  if (role == "admin")
+                    _menuItem(context, icon: Icons.assignment, title: "Peminjaman", keyValue: "daftarpeminjaman"),
 
-                  if (widget.role == "petugas")
-                    _menuItem(
-                      context,
-                      icon: Icons.assignment,
-                      title: "Peminjaman",
-                      keyValue: "penerimaan",
-                    ),
+                  if (role == "petugas")
+                    _menuItem(context, icon: Icons.assignment, title: "Peminjaman", keyValue: "penerimaan"),
 
-                  if (widget.role == "admin")
-                    _menuItem(
-                      context,
-                      icon: Icons.history,
-                      title: "Log Aktivitas",
-                      keyValue: "logs",
-                    ),
+                  if (role == "admin")
+                    _menuItem(context, icon: Icons.history, title: "Log Aktivitas", keyValue: "logs"),
 
-                  if (widget.role == "petugas")
-                    _menuItem(
-                      context,
-                      icon: Icons.print,
-                      title: "Laporan",
-                      keyValue: "laporan",
-                    ),
+                  if (role == "petugas")
+                    _menuItem(context, icon: Icons.print, title: "Laporan", keyValue: "laporan"),
 
                   const Divider(),
 
-                  _menuItem(
-                    context,
-                    icon: Icons.logout,
-                    title: "Logout",
-                    keyValue: "logout",
-                    isDanger: true,
-                  ),
+                  _menuItem(context, icon: Icons.logout, title: "Logout", keyValue: "logout", isDanger: true),
                 ],
               ),
             ),
@@ -171,7 +113,7 @@ class _SideMenuState extends State<SideMenu> {
     );
   }
 
-  // ================= MENU ITEM =================
+  /// ================= MENU ITEM BUILDER =================
   Widget _menuItem(
     BuildContext context, {
     required IconData icon,
@@ -194,15 +136,13 @@ class _SideMenuState extends State<SideMenu> {
                 color: isDanger ? AppTheme.statusLate : AppTheme.textPrimary,
               ),
         ),
-        onTap: () {
+        onTap: () async {
           Navigator.of(context).pop(); // tutup drawer
 
           switch (keyValue) {
             case 'dashboard':
-              NavigationService.navigateAndRemoveUntil(
-                '/dashboard',
-                arguments: widget.role,
-              );
+              final r = await SupabaseService.getRole() ?? role;
+              NavigationService.navigateAndRemoveUntil('/dashboard', arguments: r);
               break;
 
             case 'daftaralat':
@@ -231,14 +171,18 @@ class _SideMenuState extends State<SideMenu> {
 
             case 'laporan':
               NavigationService.navigateTo('/laporan');
+              break;
 
             case 'alat':
               NavigationService.navigateTo('/alat');
+              break;
 
             case 'pinjam':
               NavigationService.navigateTo('/pinjam');
+              break;
 
             case 'logout':
+              await SupabaseService.logout();
               NavigationService.navigateAndRemoveUntil('/login');
               break;
           }
@@ -246,8 +190,7 @@ class _SideMenuState extends State<SideMenu> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       ),
     );
   }

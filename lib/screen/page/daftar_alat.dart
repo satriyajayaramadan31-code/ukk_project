@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import '../widget/add_alat.dart';
 import '../widget/edit_alat.dart';
+import '../widget/delete_alat.dart';
 import '../widget/app_bar.dart';
 import '../widget/side_menu.dart';
-import '../utils/models.dart';
-import '../widget/delete_alat.dart';
-import '../utils/theme.dart'; // <- penting
+import '../utils/theme.dart';
+import 'package:engine_rent_app/service/supabase_service.dart';
 
 class DaftarAlatPage extends StatefulWidget {
   const DaftarAlatPage({super.key});
@@ -15,41 +15,36 @@ class DaftarAlatPage extends StatefulWidget {
 }
 
 class _DaftarAlatPageState extends State<DaftarAlatPage> {
-  final List<String> _categories = [
-    'Elektronik',
-    'Fotografi',
-    'Presentasi',
-    'Lainnya',
-  ];
+  final SupabaseService _service = SupabaseService();
 
-  final List<Alat> _alatList = [
-    Alat(
-      id: "1",
-      name: "Laptop Dell XPS 15",
-      category: "Elektronik",
-      description: "Laptop performa tinggi untuk pengolahan data",
-      image:
-          "https://images.unsplash.com/photo-1762117666457-919e7345bd90?w=400",
-      status: "Tersedia",
-    ),
-    Alat(
-      id: "2",
-      name: "Kamera DSLR Canon",
-      category: "Fotografi",
-      description: "Kamera DSLR profesional untuk dokumentasi",
-      image:
-          "https://images.unsplash.com/photo-1764557359097-f15dd0c0a17b?w=400",
-      status: "Dipinjam",
-    ),
-  ];
+  List<Category> _categories = [];
+  List<Alat> _alatList = [];
+  List<Alat> _filteredAlat = [];
 
   final TextEditingController _searchController = TextEditingController();
-  List<Alat> _filteredAlat = [];
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _filteredAlat = _alatList;
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _loading = true);
+    try {
+      final cats = await _service.getCategories();
+      final alat = await _service.getAlat();
+      setState(() {
+        _categories = cats;
+        _alatList = alat;
+        _filteredAlat = alat;
+      });
+    } catch (e) {
+      debugPrint('❌ Gagal load data alat: $e');
+    } finally {
+      setState(() => _loading = false);
+    }
   }
 
   void _filterAlat() {
@@ -58,60 +53,107 @@ class _DaftarAlatPageState extends State<DaftarAlatPage> {
       _filteredAlat = query.isEmpty
           ? _alatList
           : _alatList.where((a) {
-              return a.name.toLowerCase().contains(query) ||
-                  a.category.toLowerCase().contains(query);
+              return a.namaAlat.toLowerCase().contains(query) ||
+                  a.kategoriNama.toLowerCase().contains(query);
             }).toList();
     });
   }
 
-  void _addAlat() async {
+  Future<void> _addAlat() async {
     final result = await showDialog<Alat>(
       context: context,
       builder: (_) => AddAlatDialog(categories: _categories),
     );
 
     if (result != null) {
-      setState(() {
-        _alatList.add(result);
-        _filterAlat();
-      });
+      setState(() => _loading = true);
+      try {
+        String imageUrl = result.fotoUrl;
+
+        // Hanya untuk Web: jika foto ada, upload
+        if (result.bytes != null) {
+          imageUrl = await SupabaseService.uploadFoto(result.bytes!, result.namaAlat);
+        }
+
+        final alat = await _service.addAlat(
+          namaAlat: result.namaAlat,
+          status: result.status,
+          kategoriId: result.kategoriId,
+          denda: result.denda,
+          perbaikan: result.perbaikan,
+        );
+
+        await _service.editAlat(
+          id: alat.id,
+          namaAlat: alat.namaAlat,
+          status: alat.status,
+          kategoriId: alat.kategoriId,
+          image: imageUrl,
+          denda: alat.denda,
+          perbaikan: alat.perbaikan,
+        );
+
+        await _loadData();
+      } catch (e) {
+        debugPrint('❌ Gagal tambah alat: $e');
+      }
     }
   }
 
-  void _editAlat(Alat alat) async {
+  Future<void> _editAlat(Alat alat) async {
     final result = await showDialog<Alat>(
       context: context,
-      builder: (_) => EditAlatDialog(
-        alat: alat,
-        categories: _categories,
-      ),
+      builder: (_) => EditAlatDialog(alat: alat, categories: _categories),
     );
 
     if (result != null) {
-      setState(() {
-        final index =
-            _alatList.indexWhere((element) => element.id == alat.id);
-        _alatList[index] = result;
-        _filterAlat();
-      });
+      setState(() => _loading = true);
+      try {
+        String imageUrl = result.fotoUrl;
+
+        // Hanya untuk Web: jika bytes baru ada, upload
+        if (result.bytes != null) {
+          if (alat.fotoUrl.isNotEmpty) {
+            await _service.deleteFoto(alat.fotoUrl);
+          }
+          imageUrl = await SupabaseService.uploadFoto(result.bytes!, result.namaAlat);
+        }
+
+        await _service.editAlat(
+          id: result.id,
+          namaAlat: result.namaAlat,
+          status: result.status,
+          kategoriId: result.kategoriId,
+          image: imageUrl,
+          denda: result.denda,
+          perbaikan: result.perbaikan,
+        );
+
+        await _loadData();
+      } catch (e) {
+        debugPrint('❌ Gagal edit alat: $e');
+      }
     }
   }
 
-  void _deleteAlat(Alat alat) {
-    setState(() {
-      _alatList.remove(alat);
-      _filterAlat();
-    });
+  Future<void> _deleteAlat(Alat alat) async {
+    setState(() => _loading = true);
+    try {
+      await _service.deleteAlat(alat.id, fotoUrl: alat.fotoUrl);
+      await _loadData();
+    } catch (e) {
+      debugPrint('❌ Gagal hapus alat: $e');
+    }
   }
 
   Color _statusColor(String status) {
     switch (status) {
       case "Tersedia":
-        return AppTheme.statusReturned; // hijau
+        return AppTheme.statusReturned;
       case "Dipinjam":
-        return AppTheme.statusBorrowed; // abu gelap
+        return AppTheme.statusBorrowed;
       case "Rusak":
-        return AppTheme.statusLate;    // merah
+        return AppTheme.statusLate;
       default:
         return AppTheme.primary;
     }
@@ -123,136 +165,121 @@ class _DaftarAlatPageState extends State<DaftarAlatPage> {
 
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Daftar Alat'),
-      drawer: const SideMenu(role: 'admin'),
-      body: ListView(
-        padding: const EdgeInsets.all(10),
-        children: [
-          TextField(
-            controller: _searchController,
-            onChanged: (_) => _filterAlat(),
-            decoration: InputDecoration(
-              labelText: 'Search alat',
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: theme.cardColor),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          Align(
-            alignment: Alignment.centerRight,
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.add),
-              label: const Text('Tambah Alat'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.colorScheme.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(50),
-                ),
-                padding: const EdgeInsets.all(10),
-              ),
-              onPressed: _addAlat,
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          Card(
-            color: theme.scaffoldBackgroundColor, // <-- warna background list
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Daftar Alat',
-                    style: theme.textTheme.headlineSmall,
+      drawer: const SideMenu(),
+      backgroundColor: theme.colorScheme.background,
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(10),
+              children: [
+                TextField(
+                  controller: _searchController,
+                  onChanged: (_) => _filterAlat(),
+                  decoration: InputDecoration(
+                    labelText: 'Search alat',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
-                  const SizedBox(height: 10),
-
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columnSpacing: 32,
-                      headingRowColor: MaterialStateProperty.all(theme.scaffoldBackgroundColor),
-                      columns: const [
-                        DataColumn(label: Text('Nama')),
-                        DataColumn(label: Text('Kategori')),
-                        DataColumn(label: Text('Deskripsi')),
-                        DataColumn(label: Text('Status')),
-                        DataColumn(label: Center(child: Text('Aksi'))),
-                      ],
-                      rows: _filteredAlat.map((alat) {
-                        return DataRow(
-                          cells: [
-                            DataCell(Text(alat.name)),
-                            DataCell(Text(alat.category)),
-                            DataCell(
-                              SizedBox(
-                                width: 220,
-                                child: Text(
-                                  alat.description,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ),
-                            DataCell(
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 6),
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.add),
+                    label: const Text('Tambah Alat'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(50),
+                      ),
+                      padding: const EdgeInsets.all(10),
+                    ),
+                    onPressed: _addAlat,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Card(
+                  color: theme.scaffoldBackgroundColor,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        columnSpacing: 20,
+                        headingRowColor:
+                            MaterialStateProperty.all(theme.scaffoldBackgroundColor),
+                        columns: const [
+                          DataColumn(label: Text('Nama')),
+                          DataColumn(label: Text('Kategori')),
+                          DataColumn(label: Text('Status')),
+                          DataColumn(label: Text('Denda')),
+                          DataColumn(label: Text('Perbaikan')),
+                          DataColumn(label: Center(child: Text('Aksi'))),
+                        ],
+                        rows: _filteredAlat.map((alat) {
+                          return DataRow(
+                            cells: [
+                              DataCell(SizedBox(
+                                  width: 180,
+                                  child: Text(
+                                    alat.namaAlat,
+                                    overflow: TextOverflow.ellipsis,
+                                  ))),
+                              DataCell(SizedBox(
+                                  width: 120,
+                                  child: Text(
+                                    alat.kategoriNama,
+                                    overflow: TextOverflow.ellipsis,
+                                  ))),
+                              DataCell(Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
                                   color: _statusColor(alat.status),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
                                   alat.status,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: Colors.white,
+                                  style: theme.textTheme.bodyMedium
+                                      ?.copyWith(color: Colors.white),
+                                ),
+                              )),
+                              DataCell(Text('Rp ${alat.denda}')),
+                              DataCell(Text('Rp ${alat.perbaikan}')),
+                              DataCell(Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, size: 18),
+                                    onPressed: () => _editAlat(alat),
                                   ),
-                                ),
-                              ),
-                            ),
-                            DataCell(
-                              Center(
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, size: 18),
-                                      onPressed: () => _editAlat(alat),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, size: 18, color: Colors.red),
-                                      onPressed: () {
-                                        showDialog(
-                                          context: context,
-                                          builder: (_) => DeleteAlatDialog(
-                                            alatName: alat.name,
-                                            onDelete: () => _deleteAlat(alat),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      }).toList(),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete,
+                                        size: 18, color: Colors.red),
+                                    onPressed: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (_) => DeleteAlatDialog(
+                                          alatName: alat.namaAlat,
+                                          onDelete: () => _deleteAlat(alat),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              )),
+                            ],
+                          );
+                        }).toList(),
+                      ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }

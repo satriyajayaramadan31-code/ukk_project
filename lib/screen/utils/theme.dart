@@ -40,18 +40,16 @@ class AppTheme {
     final scheme = const ColorScheme.light(
       primary: primary,
       secondary: primary,
-      background: background,
       surface: card,
       onPrimary: Colors.white,
       onSurface: textPrimary,
-      onBackground: textPrimary,
       error: statusLate,
     );
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: scheme.background,
+      scaffoldBackgroundColor: scheme.surface,
 
       appBarTheme: AppBarTheme(
         backgroundColor: scheme.primary,
@@ -80,12 +78,12 @@ class AppTheme {
 
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
+        fillColor: Colors.transparent,
         hintStyle: const TextStyle(color: textSecondary),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: const OutlineInputBorder(
           borderRadius: BorderRadius.all(Radius.circular(10)),
-          borderSide: BorderSide(color: card),
+          borderSide: BorderSide(color: card, width: 2),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: const BorderRadius.all(Radius.circular(10)),
@@ -93,7 +91,7 @@ class AppTheme {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: const BorderRadius.all(Radius.circular(10)),
-          borderSide: BorderSide(color: scheme.error),
+          borderSide: BorderSide(color: scheme.error, width: 1.5),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: const BorderRadius.all(Radius.circular(10)),

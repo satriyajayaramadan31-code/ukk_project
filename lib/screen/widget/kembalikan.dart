@@ -253,7 +253,7 @@ class _SelectBox extends StatelessWidget {
             label,
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: selected ? scheme.primary : scheme.onBackground,
+              color: selected ? scheme.primary : scheme.onSurface,
             ),
           ),
         ),
