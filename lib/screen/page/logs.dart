@@ -78,7 +78,7 @@ class _LogsPageState extends State<LogsPage> {
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Log Aktivitas'),
       drawer: const SideMenu(),
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       body: ListView(
         padding: const EdgeInsets.all(14),
         children: [

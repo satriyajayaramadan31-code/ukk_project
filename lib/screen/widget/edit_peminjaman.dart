@@ -174,7 +174,7 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: SingleChildScrollView(
@@ -367,7 +367,7 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
 
   Widget _statusDropdown() {
     return DropdownButtonFormField<String>(
-      value: _statuses.contains(status) ? status : 'menunggu',
+      initialValue: _statuses.contains(status) ? status : 'menunggu',
       decoration: InputDecoration(
         border: _border(context),
         enabledBorder: _border(context),

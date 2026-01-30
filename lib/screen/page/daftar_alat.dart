@@ -171,7 +171,7 @@ class _DaftarAlatPageState extends State<DaftarAlatPage> {
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Daftar Alat'),
       drawer: const SideMenu(),
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(

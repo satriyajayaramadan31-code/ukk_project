@@ -149,8 +149,9 @@ class _AddPeminjamanDialogState extends State<AddPeminjamanDialog> {
         equipmentError ||
         borrowError ||
         returnError ||
-        descriptionError)
+        descriptionError) {
       return;
+    }
 
     setState(() => _loading = true);
 
@@ -208,7 +209,7 @@ class _AddPeminjamanDialogState extends State<AddPeminjamanDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: SingleChildScrollView(
@@ -418,7 +419,7 @@ class _AddPeminjamanDialogState extends State<AddPeminjamanDialog> {
 
   Widget _statusDropdown({required String value}) {
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       decoration: InputDecoration(
         border: _border(context),
         enabledBorder: _border(context),

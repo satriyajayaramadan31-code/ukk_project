@@ -172,7 +172,7 @@ class SupabaseService {
 
       await _client.from('log_aktivitas').insert({
         'name': uid, // FK user.id
-        'aksi': '$description',
+        'aksi': description,
       });
 
       debugPrint('✅ Log ditambahkan: ($uid) $description');
@@ -569,10 +569,10 @@ class SupabaseService {
     final parts = url.split('/');
     final fileName = parts.last;
     try {
-      await _client.storage.from('Image').remove(['$fileName']);
+      await _client.storage.from('Image').remove([fileName]);
     } catch (e) {
       debugPrint('❌ Gagal hapus foto: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -670,7 +670,7 @@ class SupabaseService {
       debugPrint('✅ Alat $id berhasil dihapus');
     } catch (e) {
       debugPrint('❌ Gagal hapus alat $id: $e');
-      throw e;
+      rethrow;
     }
   }
 
