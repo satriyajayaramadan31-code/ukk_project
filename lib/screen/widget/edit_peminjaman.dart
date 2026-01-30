@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../models/loan.dart';
 import 'package:intl/intl.dart';
+import 'package:engine_rent_app/service/supabase_service.dart';
 
 class EditPeminjamanDialog extends StatefulWidget {
-  final Loan loan;
-  final Function(Loan) onEdit;
+  final Map<String, dynamic> loan;
+  final Function(Map<String, dynamic>) onEdit;
 
   const EditPeminjamanDialog({
     super.key,
@@ -17,31 +17,78 @@ class EditPeminjamanDialog extends StatefulWidget {
 }
 
 class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
-  late TextEditingController userController;
-  late TextEditingController equipmentController;
-  late TextEditingController borrowController;
-  late TextEditingController returnController;
-  late TextEditingController dueController;
-  late TextEditingController descriptionController;
-  late LoanStatus status;
+  // controllers
+  final userController = TextEditingController();
+  final equipmentController = TextEditingController();
+  final borrowController = TextEditingController();
+  final returnController = TextEditingController();
+  final dueController = TextEditingController();
+  final descriptionController = TextEditingController();
+
+  // selected ids
+  int? _selectedUserId;
+  int? _selectedAlatId;
 
   bool userError = false;
   bool equipmentError = false;
   bool borrowError = false;
   bool descriptionError = false;
 
+  bool _loading = false;
+
   final _radius = BorderRadius.circular(8);
+
+  // status valid
+  final List<String> _statuses = const [
+    'menunggu',
+    'diproses',
+    'dipinjam',
+    'dikembalikan',
+    'terlambat',
+    'ditolak',
+  ];
+
+  String status = 'menunggu';
+
+  // data autocomplete
+  List<Map<String, dynamic>> _users = [];
+  List<Map<String, dynamic>> _alatList = [];
 
   @override
   void initState() {
     super.initState();
-    userController = TextEditingController(text: widget.loan.userName);
-    equipmentController = TextEditingController(text: widget.loan.equipmentName);
-    borrowController = TextEditingController(text: widget.loan.borrowDate);
-    returnController = TextEditingController(text: widget.loan.returnDate);
-    dueController = TextEditingController(text: widget.loan.dueDate);
-    descriptionController = TextEditingController(text: widget.loan.description);
-    status = widget.loan.status;
+    _loadAutocompleteData();
+
+    // populate controllers from loan
+    userController.text = (widget.loan['username'] ?? '').toString();
+    equipmentController.text = (widget.loan['nama_alat'] ?? '').toString();
+    borrowController.text = (widget.loan['tanggal_pinjam'] ?? '').toString();
+    returnController.text = (widget.loan['tanggal_kembali'] ?? '').toString();
+    dueController.text =
+        (widget.loan['tanggal_pengembalian'] ?? '').toString();
+    descriptionController.text = (widget.loan['alasan'] ?? '').toString();
+
+    // set initial selected ids if available
+    _selectedUserId = widget.loan['user_id'] as int?;
+    _selectedAlatId = widget.loan['alat_id'] as int?;
+
+    final rawStatus = (widget.loan['status'] ?? 'menunggu').toString();
+    final normalized = rawStatus.toLowerCase().trim();
+    status = _statuses.contains(normalized) ? normalized : 'menunggu';
+  }
+
+  Future<void> _loadAutocompleteData() async {
+    try {
+      final users = await SupabaseService.getUsers();
+      final alat = await SupabaseService.getAlatList();
+      if (!mounted) return;
+      setState(() {
+        _users = users;
+        _alatList = alat;
+      });
+    } catch (e) {
+      debugPrint("❌ LOAD AUTOCOMPLETE ERROR: $e");
+    }
   }
 
   @override
@@ -63,15 +110,14 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
         ),
       );
 
-  String statusText(LoanStatus status) => status.toString().split('.').last;
-
   Future<void> _pickDate(TextEditingController controller) async {
-    DateTime now = DateTime.now();
-    DateTime? picked = await showDatePicker(
+    final now = DateTime.now();
+    final initial =
+        controller.text.isEmpty ? now : DateTime.tryParse(controller.text) ?? now;
+
+    final picked = await showDatePicker(
       context: context,
-      initialDate: controller.text.isEmpty
-          ? now
-          : DateTime.tryParse(controller.text) ?? now,
+      initialDate: initial,
       firstDate: DateTime(now.year - 5),
       lastDate: DateTime(now.year + 5),
     );
@@ -81,89 +127,44 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
     }
   }
 
-  void _showPopup({
-    required IconData icon,
-    required String text,
-  }) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        final size = MediaQuery.of(context).size;
-
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: SizedBox(
-            width: size.width * 0.8,
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Align(
-                    alignment: Alignment.topRight,
-                    child: IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Icon(
-                    icon,
-                    size: 72,
-                    color: Colors.green,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    text,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 20),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      if (Navigator.canPop(context)) Navigator.pop(context);
-    });
-  }
-
-  void _submit() {
+  Future<void> _submit() async {
     setState(() {
-      userError = userController.text.trim().isEmpty;
-      equipmentError = equipmentController.text.trim().isEmpty;
+      userError = _selectedUserId == null;
+      equipmentError = _selectedAlatId == null;
       borrowError = borrowController.text.trim().isEmpty;
       descriptionError = descriptionController.text.trim().isEmpty;
     });
 
     if (userError || equipmentError || borrowError || descriptionError) return;
 
-    final updatedLoan = Loan(
-      id: widget.loan.id,
-      userName: userController.text.trim(),
-      equipmentName: equipmentController.text.trim(),
-      borrowDate: borrowController.text.trim(),
-      returnDate: returnController.text.trim(), // nullable
-      dueDate: dueController.text.trim(),
-      description: descriptionController.text.trim(), // nullable
-      status: status,
-    );
+    setState(() => _loading = true);
 
-    widget.onEdit(updatedLoan);
-    Navigator.pop(context);
+    try {
+      final updated = await SupabaseService.editPeminjaman(
+        id: widget.loan['id'],
+        userId: _selectedUserId!,
+        alatId: _selectedAlatId!,
+        tanggalPinjam: borrowController.text.trim(),
+        tanggalKembali: returnController.text.trim(),
+        tanggalPengembalian:
+            dueController.text.trim().isEmpty ? null : dueController.text.trim(),
+        alasan: descriptionController.text.trim(),
+        status: status,
+      );
 
-    _showPopup(
-      icon: Icons.check_circle,
-      text: "Peminjaman Berhasil\nDiedit",
-    );
+      widget.onEdit(updated);
+
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (e) {
+      debugPrint('❌ EDIT PEMINJAMAN ERROR: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal edit peminjaman: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -172,8 +173,8 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      backgroundColor: theme.colorScheme.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      backgroundColor: theme.colorScheme.background,
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: SingleChildScrollView(
@@ -186,18 +187,17 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
                   style: theme.textTheme.headlineSmall,
                 ),
               ),
-
               const SizedBox(height: 16),
 
               _label("Nama Peminjam", theme),
-              _textField(userController),
-              if (userError) _error("Nama peminjam wajib diisi", theme),
+              _userAutocomplete(),
+              if (userError) _error("Pilih user dari daftar", theme),
 
               const SizedBox(height: 12),
 
               _label("Nama Alat", theme),
-              _textField(equipmentController),
-              if (equipmentError) _error("Nama alat wajib diisi", theme),
+              _alatAutocomplete(),
+              if (equipmentError) _error("Pilih alat dari daftar", theme),
 
               const SizedBox(height: 12),
 
@@ -209,24 +209,22 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
 
               _label("Tanggal Kembali", theme),
               _dateField(returnController, "Pilih Tanggal Kembali"),
-              if (borrowError) _error("Tanggal kembali wajib diisi", theme),
 
               const SizedBox(height: 12),
 
               _label("Dikembalikan", theme),
-              _dateField(dueController, "Pilih Tanggal Dikembalikan"),              
+              _dateField(dueController, "Tanggal pengembalian (opsional)"),
 
               const SizedBox(height: 12),
 
-              _label("Deskripsi", theme),
-              _textField(descriptionController),              
-              if (descriptionError) _error("Deskripsi diisi", theme),
+              _label("Deskripsi / Alasan", theme),
+              _textField(descriptionController),
+              if (descriptionError) _error("Deskripsi wajib diisi", theme),
 
               const SizedBox(height: 12),
-
 
               _label("Status", theme),
-              _statusDropdown(context),
+              _statusDropdown(),
 
               const SizedBox(height: 20),
 
@@ -234,38 +232,35 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _submit,
+                      onPressed: _loading ? null : _submit,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: theme.colorScheme.primary,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(5),
-                        ),
+                            borderRadius: BorderRadius.circular(6)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      child: const Text("Simpan"),
+                      child: _loading
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text("Simpan"),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton(
+                      onPressed: _loading ? null : () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(
-                          color: theme.colorScheme.primary,
-                          width: 1.5,
-                        ),
+                            color: theme.colorScheme.primary, width: 1.5),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(5),
-                        ),
+                            borderRadius: BorderRadius.circular(6)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(
-                        'Batal',
-                        style: theme.textTheme.bodyMedium!.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      child: const Text("Batal"),
                     ),
                   ),
                 ],
@@ -277,59 +272,115 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
     );
   }
 
-  Widget _label(String text, ThemeData theme) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(
-          text,
-          style: theme.textTheme.bodyLarge,
+  Widget _label(String text, ThemeData theme) =>
+      Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(text, style: theme.textTheme.bodyLarge));
+
+  Widget _textField(TextEditingController c) => TextField(
+        controller: c,
+        decoration: InputDecoration(
+          border: _border(context),
+          enabledBorder: _border(context),
+          focusedBorder: _border(context),
         ),
       );
 
-  Widget _textField(TextEditingController controller,
-      {bool isPassword = false}) {
-    return TextField(
-      controller: controller,
-      obscureText: isPassword,
-      decoration: InputDecoration(
-        border: _border(context),
-        enabledBorder: _border(context),
-        focusedBorder: _border(context),
-      ),
+  Widget _dateField(TextEditingController c, String hint) => TextField(
+        controller: c,
+        readOnly: true,
+        onTap: () => _pickDate(c),
+        decoration: InputDecoration(
+          hintText: hint,
+          suffixIcon: const Icon(Icons.calendar_month),
+          border: _border(context),
+          enabledBorder: _border(context),
+          focusedBorder: _border(context),
+        ),
+      );
+
+  Widget _userAutocomplete() {
+    return Autocomplete<Map<String, dynamic>>(
+      optionsBuilder: (TextEditingValue value) {
+        final query = value.text.toLowerCase().trim();
+        if (query.isEmpty) return const Iterable<Map<String, dynamic>>.empty();
+        return _users.where((u) => (u['username'] ?? '').toString().toLowerCase().contains(query));
+      },
+      displayStringForOption: (opt) => opt['username'].toString(),
+      onSelected: (opt) {
+        setState(() {
+          _selectedUserId = (opt['id'] as num).toInt();
+          userError = false;
+        });
+        userController.text = opt['username'].toString();
+      },
+      fieldViewBuilder: (context, textController, focusNode, onSubmitted) {
+        return TextField(
+          controller: textController,
+          focusNode: focusNode,
+          decoration: InputDecoration(
+            hintText: "Ketik nama user...",
+            border: _border(context),
+            enabledBorder: _border(context),
+            focusedBorder: _border(context),
+          ),
+          onChanged: (v) {
+            userController.text = v;
+            setState(() => _selectedUserId = null);
+          },
+        );
+      },
     );
   }
 
-  Widget _dateField(TextEditingController controller, String hint) {
-    return TextField(
-      controller: controller,
-      readOnly: true,
-      onTap: () => _pickDate(controller),
-      decoration: InputDecoration(
-        hintText: hint,
-        border: _border(context),
-        enabledBorder: _border(context),
-        focusedBorder: _border(context),
-        suffixIcon: const Icon(Icons.calendar_month),
-      ),
+  Widget _alatAutocomplete() {
+    return Autocomplete<Map<String, dynamic>>(
+      optionsBuilder: (TextEditingValue value) {
+        final query = value.text.toLowerCase().trim();
+        if (query.isEmpty) return const Iterable<Map<String, dynamic>>.empty();
+        return _alatList.where((a) => (a['nama_alat'] ?? '').toString().toLowerCase().contains(query));
+      },
+      displayStringForOption: (opt) => opt['nama_alat'].toString(),
+      onSelected: (opt) {
+        setState(() {
+          _selectedAlatId = (opt['id'] as num).toInt();
+          equipmentError = false;
+        });
+        equipmentController.text = opt['nama_alat'].toString();
+      },
+      fieldViewBuilder: (context, textController, focusNode, onSubmitted) {
+        return TextField(
+          controller: textController,
+          focusNode: focusNode,
+          decoration: InputDecoration(
+            hintText: "Ketik nama alat...",
+            border: _border(context),
+            enabledBorder: _border(context),
+            focusedBorder: _border(context),
+          ),
+          onChanged: (v) {
+            equipmentController.text = v;
+            setState(() => _selectedAlatId = null);
+          },
+        );
+      },
     );
   }
 
-  Widget _statusDropdown(BuildContext context) {
-    return DropdownButtonFormField<LoanStatus>(
-      initialValue: status,
+  Widget _statusDropdown() {
+    return DropdownButtonFormField<String>(
+      value: _statuses.contains(status) ? status : 'menunggu',
       decoration: InputDecoration(
         border: _border(context),
         enabledBorder: _border(context),
         focusedBorder: _border(context),
       ),
-      items: LoanStatus.values
-          .map(
-            (s) => DropdownMenuItem(
-              value: s,
-              child: Text(statusText(s)),
-            ),
-          )
-          .toList(),
-      onChanged: (v) => setState(() => status = v!),
+      items: _statuses.map((s) {
+        final label = s[0].toUpperCase() + s.substring(1);
+        return DropdownMenuItem(value: s, child: Text(label));
+      }).toList(),
+      onChanged: (v) {
+        if (v == null) return;
+        setState(() => status = v);
+      },
     );
   }
 
@@ -337,10 +388,7 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
         padding: const EdgeInsets.only(top: 4),
         child: Text(
           text,
-          style: theme.textTheme.bodySmall!.copyWith(
-            color: Colors.red,
-            fontSize: 11,
-          ),
+          style: theme.textTheme.bodySmall!.copyWith(color: Colors.red, fontSize: 11),
         ),
       );
 }

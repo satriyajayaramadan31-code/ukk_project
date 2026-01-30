@@ -24,17 +24,28 @@ class _DaftarAlatPageState extends State<DaftarAlatPage> {
   final TextEditingController _searchController = TextEditingController();
   bool _loading = true;
 
+  bool _dialogOpen = false; // 🔥 prevent double open dialog
+
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadInitialData();
+    _searchController.addListener(_filterAlat);
   }
 
-  Future<void> _loadData() async {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadInitialData() async {
     setState(() => _loading = true);
     try {
       final cats = await _service.getCategories();
       final alat = await _service.getAlat();
+
+      if (!mounted) return;
       setState(() {
         _categories = cats;
         _alatList = alat;
@@ -43,15 +54,16 @@ class _DaftarAlatPageState extends State<DaftarAlatPage> {
     } catch (e) {
       debugPrint('❌ Gagal load data alat: $e');
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   void _filterAlat() {
     final query = _searchController.text.toLowerCase();
+
     setState(() {
       _filteredAlat = query.isEmpty
-          ? _alatList
+          ? List.from(_alatList)
           : _alatList.where((a) {
               return a.namaAlat.toLowerCase().contains(query) ||
                   a.kategoriNama.toLowerCase().contains(query);
@@ -59,90 +71,83 @@ class _DaftarAlatPageState extends State<DaftarAlatPage> {
     });
   }
 
+  // ================= ADD =================
   Future<void> _addAlat() async {
-    final result = await showDialog<Alat>(
-      context: context,
-      builder: (_) => AddAlatDialog(categories: _categories),
-    );
+    if (_dialogOpen) return;
+    setState(() => _dialogOpen = true);
 
-    if (result != null) {
-      setState(() => _loading = true);
-      try {
-        String imageUrl = result.fotoUrl;
+    try {
+      final result = await showDialog<Alat>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AddAlatDialog(categories: _categories),
+      );
 
-        // Hanya untuk Web: jika foto ada, upload
-        if (result.bytes != null) {
-          imageUrl = await SupabaseService.uploadFoto(result.bytes!, result.namaAlat);
+      if (!mounted) return;
+
+      if (result != null) {
+        final exists = _alatList.any((a) => a.id == result.id);
+        if (!exists) {
+          setState(() {
+            _alatList.insert(0, result);
+          });
+          _filterAlat();
         }
-
-        final alat = await _service.addAlat(
-          namaAlat: result.namaAlat,
-          status: result.status,
-          kategoriId: result.kategoriId,
-          denda: result.denda,
-          perbaikan: result.perbaikan,
-        );
-
-        await _service.editAlat(
-          id: alat.id,
-          namaAlat: alat.namaAlat,
-          status: alat.status,
-          kategoriId: alat.kategoriId,
-          image: imageUrl,
-          denda: alat.denda,
-          perbaikan: alat.perbaikan,
-        );
-
-        await _loadData();
-      } catch (e) {
-        debugPrint('❌ Gagal tambah alat: $e');
       }
+    } catch (e) {
+      debugPrint('❌ Gagal tambah alat: $e');
+    } finally {
+      if (mounted) setState(() => _dialogOpen = false);
     }
   }
 
+  // ================= EDIT =================
   Future<void> _editAlat(Alat alat) async {
-    final result = await showDialog<Alat>(
-      context: context,
-      builder: (_) => EditAlatDialog(alat: alat, categories: _categories),
-    );
+    if (_dialogOpen) return;
+    setState(() => _dialogOpen = true);
 
-    if (result != null) {
-      setState(() => _loading = true);
-      try {
-        String imageUrl = result.fotoUrl;
+    try {
+      final result = await showDialog<Alat>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => EditAlatDialog(alat: alat, categories: _categories),
+      );
 
-        // Hanya untuk Web: jika bytes baru ada, upload
-        if (result.bytes != null) {
-          if (alat.fotoUrl.isNotEmpty) {
-            await _service.deleteFoto(alat.fotoUrl);
-          }
-          imageUrl = await SupabaseService.uploadFoto(result.bytes!, result.namaAlat);
-        }
+      if (!mounted) return;
 
-        await _service.editAlat(
-          id: result.id,
-          namaAlat: result.namaAlat,
-          status: result.status,
-          kategoriId: result.kategoriId,
-          image: imageUrl,
-          denda: result.denda,
-          perbaikan: result.perbaikan,
-        );
-
-        await _loadData();
-      } catch (e) {
-        debugPrint('❌ Gagal edit alat: $e');
+      if (result != null) {
+        setState(() {
+          final idx = _alatList.indexWhere((a) => a.id == result.id);
+          if (idx != -1) _alatList[idx] = result;
+        });
+        _filterAlat();
       }
+    } catch (e) {
+      debugPrint('❌ Gagal edit alat: $e');
+    } finally {
+      if (mounted) setState(() => _dialogOpen = false);
     }
   }
 
+  // ================= DELETE =================
   Future<void> _deleteAlat(Alat alat) async {
+    if (_loading) return;
+
     setState(() => _loading = true);
+
     try {
       await _service.deleteAlat(alat.id, fotoUrl: alat.fotoUrl);
-      await _loadData();
+
+      if (!mounted) return;
+
+      setState(() {
+        _alatList.removeWhere((a) => a.id == alat.id);
+      });
+      _filterAlat();
     } catch (e) {
       debugPrint('❌ Gagal hapus alat: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -172,9 +177,9 @@ class _DaftarAlatPageState extends State<DaftarAlatPage> {
           : ListView(
               padding: const EdgeInsets.all(10),
               children: [
+                // SEARCH
                 TextField(
                   controller: _searchController,
-                  onChanged: (_) => _filterAlat(),
                   decoration: InputDecoration(
                     labelText: 'Search alat',
                     prefixIcon: const Icon(Icons.search),
@@ -183,7 +188,10 @@ class _DaftarAlatPageState extends State<DaftarAlatPage> {
                     ),
                   ),
                 ),
+
                 const SizedBox(height: 10),
+
+                // ADD BUTTON
                 Align(
                   alignment: Alignment.centerRight,
                   child: ElevatedButton.icon(
@@ -197,84 +205,121 @@ class _DaftarAlatPageState extends State<DaftarAlatPage> {
                       ),
                       padding: const EdgeInsets.all(10),
                     ),
-                    onPressed: _addAlat,
+                    onPressed: (_dialogOpen) ? null : _addAlat,
                   ),
                 ),
+
                 const SizedBox(height: 10),
+
+                // TABLE CARD
                 Card(
                   color: theme.scaffoldBackgroundColor,
                   child: Padding(
                     padding: const EdgeInsets.all(12),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        columnSpacing: 20,
-                        headingRowColor:
-                            MaterialStateProperty.all(theme.scaffoldBackgroundColor),
-                        columns: const [
-                          DataColumn(label: Text('Nama')),
-                          DataColumn(label: Text('Kategori')),
-                          DataColumn(label: Text('Status')),
-                          DataColumn(label: Text('Denda')),
-                          DataColumn(label: Text('Perbaikan')),
-                          DataColumn(label: Center(child: Text('Aksi'))),
-                        ],
-                        rows: _filteredAlat.map((alat) {
-                          return DataRow(
-                            cells: [
-                              DataCell(SizedBox(
-                                  width: 180,
-                                  child: Text(
-                                    alat.namaAlat,
-                                    overflow: TextOverflow.ellipsis,
-                                  ))),
-                              DataCell(SizedBox(
-                                  width: 120,
-                                  child: Text(
-                                    alat.kategoriNama,
-                                    overflow: TextOverflow.ellipsis,
-                                  ))),
-                              DataCell(Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: _statusColor(alat.status),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  alat.status,
-                                  style: theme.textTheme.bodyMedium
-                                      ?.copyWith(color: Colors.white),
-                                ),
-                              )),
-                              DataCell(Text('Rp ${alat.denda}')),
-                              DataCell(Text('Rp ${alat.perbaikan}')),
-                              DataCell(Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit, size: 18),
-                                    onPressed: () => _editAlat(alat),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ✅ JUDUL (seperti halaman lain)
+                        Text(
+                          'Daftar Alat',
+                          style: theme.textTheme.headlineSmall,
+                        ),
+                        const SizedBox(height: 10),
+
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: DataTable(
+                            columnSpacing: 20,
+                            headingRowColor: WidgetStateProperty.all(
+                              theme.scaffoldBackgroundColor,
+                            ),
+                            columns: const [
+                              DataColumn(label: Text('Nama')),
+                              DataColumn(label: Text('Kategori')),
+                              DataColumn(label: Text('Status')),
+                              DataColumn(label: Text('Denda')),
+                              DataColumn(label: Text('Perbaikan')),
+                              DataColumn(label: Center(child: Text('Aksi'))),
+                            ],
+                            rows: _filteredAlat.map((alat) {
+                              return DataRow(
+                                cells: [
+                                  DataCell(
+                                    SizedBox(
+                                      width: 180,
+                                      child: Text(
+                                        alat.namaAlat,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete,
-                                        size: 18, color: Colors.red),
-                                    onPressed: () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (_) => DeleteAlatDialog(
-                                          alatName: alat.namaAlat,
-                                          onDelete: () => _deleteAlat(alat),
+                                  DataCell(
+                                    SizedBox(
+                                      width: 120,
+                                      child: Text(
+                                        alat.kategoriNama,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: _statusColor(alat.status),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        alat.status,
+                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                          color: Colors.white,
                                         ),
-                                      );
-                                    },
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(Text('Rp ${alat.denda}')),
+                                  DataCell(Text('Rp ${alat.perbaikan}')),
+                                  DataCell(
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.edit, size: 18),
+                                          onPressed: _dialogOpen
+                                              ? null
+                                              : () => _editAlat(alat),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.delete,
+                                            size: 18,
+                                            color: Colors.red,
+                                          ),
+                                          onPressed: _dialogOpen
+                                              ? null
+                                              : () {
+                                                  showDialog(
+                                                    context: context,
+                                                    builder: (_) => DeleteAlatDialog(
+                                                      alatName: alat.namaAlat,
+                                                      onDelete: () => _deleteAlat(alat),
+                                                    ),
+                                                  );
+                                                },
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
-                              )),
-                            ],
-                          );
-                        }).toList(),
-                      ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

@@ -4,7 +4,9 @@ import '../utils/theme.dart';
 class DeletePeminjamanDialog extends StatelessWidget {
   final String equipmentName;
   final String userName;
-  final VoidCallback onDelete;
+
+  // IMPORTANT: harus async supaya bisa await delete supabase
+  final Future<void> Function() onDelete;
 
   const DeletePeminjamanDialog({
     super.key,
@@ -14,13 +16,13 @@ class DeletePeminjamanDialog extends StatelessWidget {
   });
 
   void _showPopup({
-    required BuildContext context,
+    required NavigatorState nav,
     required IconData icon,
     required String text,
     required Color color,
   }) {
     showDialog(
-      context: context,
+      context: nav.context,
       barrierDismissible: false,
       builder: (context) {
         return Dialog(
@@ -36,15 +38,13 @@ class DeletePeminjamanDialog extends StatelessWidget {
                   alignment: Alignment.topRight,
                   child: IconButton(
                     icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      if (nav.canPop()) nav.pop();
+                    },
                   ),
                 ),
                 const SizedBox(height: 12),
-                Icon(
-                  icon,
-                  size: 72,
-                  color: color,
-                ),
+                Icon(icon, size: 72, color: color),
                 const SizedBox(height: 16),
                 Text(
                   text,
@@ -60,8 +60,7 @@ class DeletePeminjamanDialog extends StatelessWidget {
     );
 
     Future.delayed(const Duration(seconds: 2), () {
-      if (!Navigator.canPop(context)) return;
-      Navigator.pop(context);
+      if (nav.canPop()) nav.pop();
     });
   }
 
@@ -103,23 +102,36 @@ class DeletePeminjamanDialog extends StatelessWidget {
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      onDelete();
+                    onPressed: () async {
+                      final nav = Navigator.of(context);
 
-                      _showPopup(
-                        context: context,
-                        icon: Icons.check_circle,
-                        text: 'Peminjaman Berhasil\nDihapus',
-                        color: Colors.green,
-                      );
+                      // tutup dialog konfirmasi dulu
+                      nav.pop();
+
+                      try {
+                        await onDelete();
+
+                        _showPopup(
+                          nav: nav,
+                          icon: Icons.check_circle,
+                          text: 'Peminjaman Berhasil\nDihapus',
+                          color: Colors.green,
+                        );
+                      } catch (e) {
+                        _showPopup(
+                          nav: nav,
+                          icon: Icons.error,
+                          text: 'Gagal menghapus peminjaman',
+                          color: Colors.red,
+                        );
+                      }
                     },
                     child: Text(
                       'Hapus',
                       style: theme.textTheme.bodyMedium!.copyWith(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white
+                        color: Colors.white,
                       ),
                     ),
                   ),

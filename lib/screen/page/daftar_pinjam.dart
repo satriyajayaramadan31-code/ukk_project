@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../widget/app_bar.dart';
 import '../widget/side_menu.dart';
 import '../widget/add_peminjaman.dart';
 import '../widget/edit_peminjaman.dart';
 import '../widget/delete_peminjaman.dart';
 import '../widget/pinjam_card.dart';
-import '../models/loan.dart';
 import '../utils/theme.dart';
-import 'package:intl/intl.dart';
+import 'package:engine_rent_app/service/supabase_service.dart';
 
 class DaftarPinjam extends StatefulWidget {
   const DaftarPinjam({super.key});
@@ -17,56 +19,102 @@ class DaftarPinjam extends StatefulWidget {
 }
 
 class _DaftarPinjamState extends State<DaftarPinjam> {
-  final List<Loan> _loans = [
-    Loan(
-      id: "1",
-      userName: "John Doe",
-      equipmentName: "Laptop Dell XPS 15",
-      borrowDate: "2026-01-05",
-      returnDate: "",
-      dueDate: "2026-01-12",
-      description: "Untuk presentasi proyek",
-      status: LoanStatus.dipinjam,
-    ),
-    Loan(
-      id: "2",
-      userName: "Jane Smith",
-      equipmentName: "Kamera DSLR Canon",
-      borrowDate: "2026-01-01",
-      returnDate: "",
-      dueDate: "2026-01-08",
-      description: "Pemotretan acara",
-      status: LoanStatus.terlambat,
-    ),
-    Loan(
-      id: "3",
-      userName: "Bob Johnson",
-      equipmentName: "Proyektor Epson",
-      borrowDate: "2026-01-03",
-      returnDate: "2026-01-08",
-      dueDate: "2026-01-10",
-      description: "Presentasi bisnis",
-      status: LoanStatus.dikembalikan,
-    ),
-    Loan(
-      id: "4",
-      userName: "Alice Brown",
-      equipmentName: "Mikrofon Wireless",
-      borrowDate: "",
-      returnDate: "",
-      dueDate: "2026-01-15",
-      description: "Untuk acara seminar",
-      status: LoanStatus.menunggu,
-    ),
-  ];
-
   final TextEditingController _searchController = TextEditingController();
-  List<Loan> _filteredLoans = [];
+
+  List<Map<String, dynamic>> _loans = [];
+  List<Map<String, dynamic>> _filteredLoans = [];
+
+  bool _loading = true;
+  String? _role;
+
+  RealtimeChannel? _channel;
 
   @override
   void initState() {
     super.initState();
-    _filteredLoans = _loans;
+    _init();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+
+    if (_channel != null) {
+      Supabase.instance.client.removeChannel(_channel!);
+      _channel = null;
+    }
+
+    super.dispose();
+  }
+
+  Future<void> _init() async {
+    setState(() => _loading = true);
+
+    _role = await SupabaseService.getRole() ?? 'Admin';
+    await _fetchLoans();
+
+    _setupRealtime(); // start realtime
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+  }
+
+  // =================== REALTIME (FIX) ===================
+  void _setupRealtime() {
+    final client = Supabase.instance.client;
+
+    // pastikan ga double subscribe
+    if (_channel != null) {
+      client.removeChannel(_channel!);
+      _channel = null;
+    }
+
+    // channel name disarankan pakai schema:table biar aman
+    _channel = client.channel('public:peminjaman');
+
+    _channel!
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'peminjaman',
+          callback: (payload) async {
+            debugPrint('🔥 REALTIME PEMINJAMAN: ${payload.eventType}');
+            debugPrint('payload.newRecord = ${payload.newRecord}');
+            debugPrint('payload.oldRecord = ${payload.oldRecord}');
+
+            // cara paling aman: fetch ulang
+            await _fetchLoans();
+          },
+        )
+        .subscribe((status, error) async {
+      debugPrint('📡 Realtime subscribe status: $status');
+      if (error != null) debugPrint('❌ Realtime error: $error');
+
+      // kalau baru subscribe, refresh 1x
+      if (status == RealtimeSubscribeStatus.subscribed) {
+        await _fetchLoans();
+      }
+    });
+  }
+
+  Future<void> _fetchLoans() async {
+    try {
+      final data = await SupabaseService.getPeminjaman(role: _role ?? 'Admin');
+
+      if (!mounted) return;
+      setState(() {
+        _loans = data;
+        _filteredLoans = data;
+      });
+
+      _filterLoans();
+    } catch (e) {
+      debugPrint('❌ FETCH PEMINJAMAN ERROR: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal mengambil data peminjaman: $e')),
+      );
+    }
   }
 
   void _filterLoans() {
@@ -75,306 +123,378 @@ class _DaftarPinjamState extends State<DaftarPinjam> {
       _filteredLoans = query.isEmpty
           ? _loans
           : _loans.where((l) {
-              return l.userName.toLowerCase().contains(query) ||
-                  l.equipmentName.toLowerCase().contains(query);
+              final user = (l['username'] ?? '').toString().toLowerCase();
+              final alat = (l['nama_alat'] ?? '').toString().toLowerCase();
+              return user.contains(query) || alat.contains(query);
             }).toList();
     });
   }
 
-  String formatDate(String dateString) {
-    if (dateString.isEmpty) return "-";
-    final date = DateTime.tryParse(dateString);
-    if (date == null) return "-";
-    return DateFormat.yMMMMd('id').format(date);
+  String formatDate(dynamic dateValue) {
+    if (dateValue == null) return "-";
+    final str = dateValue.toString();
+    if (str.isEmpty) return "-";
+
+    final dt = DateTime.tryParse(str);
+    if (dt == null) return "-";
+    return DateFormat.yMMMMd('id').format(dt);
   }
 
-  String statusText(LoanStatus status) {
-    return status.toString().split('.').last;
-  }
+  // ===== status text capitalize =====
+  String statusText(dynamic status) {
+    if (status == null) return '-';
 
-  Color statusColor(LoanStatus status) {
-    switch (status) {
-      case LoanStatus.menunggu:
-        return AppTheme.statusPending;
-      case LoanStatus.dipinjam:
-        return AppTheme.statusBorrowed;
-      case LoanStatus.dikembalikan:
-        return AppTheme.statusReturned;
-      case LoanStatus.terlambat:
-        return AppTheme.statusLate;
-      case LoanStatus.diproses:
-        return AppTheme.statusConfirm;
+    final s = status.toString().trim();
+    if (s.isEmpty) return '-';
+
+    final lower = s.toLowerCase();
+    switch (lower) {
+      case 'menunggu':
+        return 'Menunggu';
+      case 'dipinjam':
+        return 'Dipinjam';
+      case 'dikembalikan':
+        return 'Dikembalikan';
+      case 'terlambat':
+        return 'Terlambat';
+      case 'ditolak':
+        return 'Ditolak';
+      case 'diproses':
+        return 'Diproses';
+      default:
+        return lower[0].toUpperCase() + lower.substring(1);
     }
   }
 
-  void _editLoan(Loan loan) {
-    setState(() {
-      final index = _loans.indexWhere((l) => l.id == loan.id);
-      _loans[index] = loan;
-      _filterLoans();
-    });
+  Color statusColor(dynamic status) {
+    final s = (status ?? '').toString().toLowerCase();
+
+    switch (s) {
+      case 'menunggu':
+        return AppTheme.statusPending;
+      case 'dipinjam':
+        return AppTheme.statusBorrowed;
+      case 'dikembalikan':
+        return AppTheme.statusReturned;
+      case 'terlambat':
+        return AppTheme.statusLate;
+      case 'ditolak':
+        return AppTheme.statusLate;
+      case 'diproses':
+        return AppTheme.statusConfirm;
+      default:
+        return Colors.grey;
+    }
   }
 
-  void _deleteLoan(Loan loan) {
-    setState(() {
-      _loans.remove(loan);
-      _filterLoans();
-    });
+  // =================== COUNT ===================
+  int _countStatus(String status) {
+    final target = status.toLowerCase();
+    return _loans.where((l) {
+      final s = (l['status'] ?? '').toString().toLowerCase();
+      return s == target;
+    }).length;
+  }
+
+  int _countOverdue() {
+    return _loans.where((l) {
+      final terlambat = int.tryParse((l['terlambat'] ?? 0).toString()) ?? 0;
+      return terlambat != 0;
+    }).length;
+  }
+
+  int _countDiproses() {
+    return _loans.where((l) {
+      final s = (l['status'] ?? '').toString().toLowerCase();
+      return s == 'diproses';
+    }).length;
+  }
+
+  Future<void> _handleDelete(Map<String, dynamic> loan) async {
+    try {
+      await SupabaseService.deletePeminjaman(id: loan['id']);
+      // realtime akan update otomatis
+    } catch (e) {
+      debugPrint('❌ DELETE LOAN ERROR: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal hapus peminjaman: $e')),
+      );
+    }
+  }
+
+  Widget _statusBadge({
+    required String text,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(color: Colors.white),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final pendingCount =
-        _loans.where((l) => l.status == LoanStatus.menunggu).length;
-    final borrowedCount =
-        _loans.where((l) => l.status == LoanStatus.dipinjam).length;
-    final returnedCount =
-        _loans.where((l) => l.status == LoanStatus.dikembalikan).length;
-    final lateCount =
-        _loans.where((l) => l.status == LoanStatus.terlambat).length;
-
     final theme = Theme.of(context);
+
+    final pendingCount = _countStatus('menunggu');
+    final borrowedCount = _countStatus('dipinjam');
+    final returnedCount = _countStatus('dikembalikan');
+    final lateCount = _countOverdue();
+    final processCount = _countDiproses();
 
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Daftar Peminjaman'),
       backgroundColor: theme.colorScheme.background,
       drawer: const SideMenu(),
-      body: ListView(
-        padding: const EdgeInsets.all(14),
-        children: [
-          // ===== STATUS GRID =====
-          Wrap(
-            spacing: 14,
-            runSpacing: 14,
-            children: [
-              SizedBox(
-                width: (MediaQuery.of(context).size.width - 42) / 2,
-                child: PinjamCard(
-                  title: 'Menunggu',
-                  value: pendingCount.toString(),
-                  color: AppTheme.statusPending,
-                ),
-              ),
-              SizedBox(
-                width: (MediaQuery.of(context).size.width - 42) / 2,
-                child: PinjamCard(
-                  title: 'Dipinjam',
-                  value: borrowedCount.toString(),
-                  color: AppTheme.statusBorrowed,
-                ),
-              ),
-              SizedBox(
-                width: (MediaQuery.of(context).size.width - 42) / 2,
-                child: PinjamCard(
-                  title: 'Dikembalikan',
-                  value: returnedCount.toString(),
-                  color: AppTheme.statusReturned,
-                ),
-              ),
-              SizedBox(
-                width: (MediaQuery.of(context).size.width - 42) / 2,
-                child: PinjamCard(
-                  title: 'Terlambat',
-                  value: lateCount.toString(),
-                  color: AppTheme.statusLate,
-                ),
-              ),
-              SizedBox(
-                width: MediaQuery.of(context).size.width - 28,
-                child: PinjamCard(
-                  title: 'Konfirmasi',
-                  value: "0",
-                  color: AppTheme.statusConfirm,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          // ===== SEARCH + ADD =====
-          Row(
-            children: [
-              Expanded(
-                flex: 7,
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (_) => _filterLoans(),
-                  decoration: InputDecoration(
-                    labelText: 'Cari peminjaman',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: theme.cardColor),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(14),
+              children: [
+                Wrap(
+                  spacing: 14,
+                  runSpacing: 14,
+                  children: [
+                    SizedBox(
+                      width: (MediaQuery.of(context).size.width - 42) / 2,
+                      child: PinjamCard(
+                        title: 'Menunggu',
+                        value: pendingCount.toString(),
+                        color: AppTheme.statusPending,
+                      ),
                     ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 3,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.add),
-                  label: const Text('Tambah'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                    SizedBox(
+                      width: (MediaQuery.of(context).size.width - 42) / 2,
+                      child: PinjamCard(
+                        title: 'Dipinjam',
+                        value: borrowedCount.toString(),
+                        color: AppTheme.statusBorrowed,
+                      ),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    SizedBox(
+                      width: (MediaQuery.of(context).size.width - 42) / 2,
+                      child: PinjamCard(
+                        title: 'Dikembalikan',
+                        value: returnedCount.toString(),
+                        color: AppTheme.statusReturned,
+                      ),
+                    ),
+                    SizedBox(
+                      width: (MediaQuery.of(context).size.width - 42) / 2,
+                      child: PinjamCard(
+                        title: 'Terlambat',
+                        value: lateCount.toString(),
+                        color: AppTheme.statusLate,
+                      ),
+                    ),
+                    SizedBox(
+                      width: MediaQuery.of(context).size.width - 28,
+                      child: PinjamCard(
+                        title: 'Konfirmasi',
+                        value: processCount.toString(),
+                        color: AppTheme.statusConfirm,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 7,
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (_) => _filterLoans(),
+                        decoration: InputDecoration(
+                          labelText: 'Cari peminjaman',
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: theme.cardColor),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 3,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.add),
+                        label: const Text('Tambah'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.colorScheme.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: () async {
+                          showDialog(
+                            context: context,
+                            builder: (_) => AddPeminjamanDialog(
+                              parentContext: context,
+                              onAdd: (_) async {},
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                Card(
+                  color: theme.colorScheme.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => AddPeminjamanDialog(
-                          parentContext: context, // tetap
-                          onAdd: (loan) {
-                            // 1️⃣ tutup dialog add
-                            Navigator.of(context).pop();
+                  elevation: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Daftar Peminjaman',
+                          style: theme.textTheme.headlineSmall,
+                        ),
+                        const SizedBox(height: 12),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: DataTable(
+                            columnSpacing: 28,
+                            headingRowColor: WidgetStatePropertyAll(
+                              theme.scaffoldBackgroundColor,
+                            ),
+                            columns: const [
+                              DataColumn(label: Text('Peminjam')),
+                              DataColumn(label: Text('Nama Alat')),
+                              DataColumn(label: Text("Alasan/Deskripsi")),
+                              DataColumn(label: Text('Tgl Pinjam')),
+                              DataColumn(label: Text('Tgl Kembali')),
+                              DataColumn(label: Text('Pengembalian')),
+                              DataColumn(label: Text('Terlambat')),
+                              DataColumn(label: Text('Rusak')),
+                              DataColumn(label: Text('Status')),
+                              DataColumn(label: Center(child: Text('Aksi'))),
+                            ],
+                            rows: _filteredLoans.map((loan) {
+                              final status =
+                                  (loan['status'] ?? '').toString().toLowerCase();
 
-                            // 2️⃣ tambah data
-                            setState(() {
-                              _loans.add(loan);
-                              _filterLoans();
-                            });
+                              final terlambat =
+                                  int.tryParse((loan['terlambat'] ?? 0).toString()) ??
+                                      0;
 
-                            // 3️⃣ popup success (manual close)
-                            showDialog(
-                              context: context,
-                              barrierDismissible: false,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('Berhasil'),
-                                content: const Text('Peminjaman berhasil ditambahkan'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.of(ctx).pop(),
-                                    child: const Text('Close'),
+                              final rusak = (loan['rusak'] == true);
+
+                              return DataRow(
+                                cells: [
+                                  DataCell(Text((loan['username'] ?? '-').toString())),
+                                  DataCell(
+                                    SizedBox(
+                                      width: 160,
+                                      child: Text(
+                                        (loan['nama_alat'] ?? '-').toString(),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        softWrap: false,
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    SizedBox(
+                                      width: 200,
+                                      child: Text(
+                                        (loan['alasan'] ?? '-').toString(),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(Text(formatDate(loan['tanggal_pinjam']))),
+                                  DataCell(Text(formatDate(loan['tanggal_kembali']))),
+                                  DataCell(Text(formatDate(loan['tanggal_pengembalian']))),
+                                  DataCell(
+                                    Text(
+                                      terlambat != 0
+                                          ? '$terlambat hari'
+                                          : (status == 'dikembalikan' ? '0' : '-'),
+                                    ),
+                                  ),
+                                  DataCell(Text(rusak ? 'Rusak' : 'Baik')),
+                                  DataCell(
+                                    _statusBadge(
+                                      text: statusText(loan['status']),
+                                      color: statusColor(loan['status']),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Center(
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.edit, size: 18),
+                                            onPressed: () async {
+                                              showDialog(
+                                                context: context,
+                                                builder: (_) => EditPeminjamanDialog(
+                                                  loan: loan,
+                                                  onEdit: (_) async {},
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                          const SizedBox(width: 8),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.delete,
+                                              size: 18,
+                                              color: Colors.red,
+                                            ),
+                                            onPressed: () {
+                                              showDialog(
+                                                context: context,
+                                                builder: (_) => DeletePeminjamanDialog(
+                                                  equipmentName:
+                                                      (loan['nama_alat'] ?? '-')
+                                                          .toString(),
+                                                  userName:
+                                                      (loan['username'] ?? '-')
+                                                          .toString(),
+                                                  onDelete: () => _handleDelete(loan),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ],
-                              ),
-                            );
-                          },
+                              );
+                            }).toList(),
+                          ),
                         ),
-                      );
-                    },
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          // ===== DATA TABLE =====
-          Card(
-            color: theme.scaffoldBackgroundColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            elevation: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Daftar Peminjaman',
-                    style: theme.textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 12),
-
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columnSpacing: 28,
-                      headingRowColor:
-                          WidgetStatePropertyAll(theme.scaffoldBackgroundColor),
-                      columns: const [
-                        DataColumn(label: Text('Peminjam')),
-                        DataColumn(label: Text('Nama Alat')),
-                        DataColumn(label: Text("Deskripsi")),
-                        DataColumn(label: Text('Tgl Pinjam')),
-                        DataColumn(label: Text('Tgl Kembali')),
-                        DataColumn(label: Text('Dikembalikan')),
-                        DataColumn(label: Text('Status')),
-                        DataColumn(label: Center(child: Text('Aksi'))),
                       ],
-                      rows: _filteredLoans.map((loan) {
-                        return DataRow(
-                          cells: [
-                            DataCell(Text(loan.userName)),
-                            DataCell(Text(loan.equipmentName)),
-                            DataCell(Text(loan.description)),
-                            DataCell(Text(formatDate(loan.borrowDate))),
-                            DataCell(Text(formatDate(loan.returnDate))),
-                            DataCell(Text(formatDate(loan.dueDate))),
-                            DataCell(
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: statusColor(loan.status),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  statusText(loan.status),
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            DataCell(
-                              Center(
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, size: 18),
-                                      onPressed: () {
-                                        showDialog(
-                                          context: context,
-                                          builder: (_) => EditPeminjamanDialog(
-                                            loan: loan,
-                                            onEdit: _editLoan,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.delete,
-                                        size: 18,
-                                        color: Colors.red,
-                                      ),
-                                      onPressed: () {
-                                        showDialog(
-                                          context: context,
-                                          builder: (_) =>
-                                              DeletePeminjamanDialog(
-                                            equipmentName: loan.equipmentName,
-                                            userName: loan.userName,
-                                            onDelete: () => _deleteLoan(loan),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      }).toList(),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }

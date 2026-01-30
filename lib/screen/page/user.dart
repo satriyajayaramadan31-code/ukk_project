@@ -162,7 +162,7 @@ class _UserPageState extends State<UserPage> {
                     scrollDirection: Axis.horizontal,
                     child: DataTable(
                       columnSpacing: 32,
-                      headingRowColor: MaterialStateProperty.all(theme.scaffoldBackgroundColor),
+                      headingRowColor: WidgetStateProperty.all(theme.scaffoldBackgroundColor),
                       columns: const [
                         DataColumn(label: Text('Username')),
                         DataColumn(label: Text('Role')),

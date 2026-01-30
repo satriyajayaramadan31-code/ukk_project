@@ -1,20 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widget/app_bar.dart';
 import '../widget/side_menu.dart';
-
-class LogEntry {
-  final String id;
-  final String timestamp;
-  final String user;
-  final String description;
-
-  LogEntry({
-    required this.id,
-    required this.timestamp,
-    required this.user,
-    required this.description,
-  });
-}
+import 'package:engine_rent_app/service/supabase_service.dart';
 
 class LogsPage extends StatefulWidget {
   const LogsPage({super.key});
@@ -25,86 +14,71 @@ class LogsPage extends StatefulWidget {
 
 class _LogsPageState extends State<LogsPage> {
   final TextEditingController _searchController = TextEditingController();
-
-  final List<LogEntry> _logs = [
-    LogEntry(
-      id: "1",
-      timestamp: "2026-01-13 14:23:15",
-      user: "Admin",
-      description: "Menambahkan user baru: John Doe (peminjam)",
-    ),
-    LogEntry(
-      id: "2",
-      timestamp: "2026-01-13 14:15:42",
-      user: "Petugas 1",
-      description: "Menyetujui peminjaman Laptop Dell XPS 15 oleh Jane Smith",
-    ),
-    LogEntry(
-      id: "3",
-      timestamp: "2026-01-13 14:10:33",
-      user: "John Doe",
-      description: "Mengajukan peminjaman Kamera DSLR Canon",
-    ),
-    LogEntry(
-      id: "4",
-      timestamp: "2026-01-13 14:05:18",
-      user: "Admin",
-      description: "Mengubah status alat Proyektor Epson menjadi Maintenance",
-    ),
-    LogEntry(
-      id: "5",
-      timestamp: "2026-01-13 13:58:27",
-      user: "Jane Smith",
-      description: "Mengembalikan Bor Listrik Bosch (Terlambat 2 hari, Denda: Rp 20.000)",
-    ),
-    LogEntry(
-      id: "6",
-      timestamp: "2026-01-13 13:45:51",
-      user: "Admin",
-      description: "Menghapus user: Alice Brown",
-    ),
-    LogEntry(
-      id: "7",
-      timestamp: "2026-01-13 13:30:12",
-      user: "Petugas 1",
-      description: "Menolak peminjaman Mikrofon Wireless oleh Bob Johnson",
-    ),
-    LogEntry(
-      id: "8",
-      timestamp: "2026-01-13 13:15:44",
-      user: "John Doe",
-      description: "Login ke sistem",
-    ),
-    LogEntry(
-      id: "9",
-      timestamp: "2026-01-13 12:55:33",
-      user: "Admin",
-      description: "Menambahkan alat baru: Tablet iPad Pro (Kategori: Elektronik)",
-    ),
-    LogEntry(
-      id: "10",
-      timestamp: "2026-01-13 12:40:21",
-      user: "Petugas 1",
-      description: "Memproses pengembalian Laptop Dell XPS 15 oleh John Doe (Tepat Waktu)",
-    ),
-  ];
-
+  List<Map<String, dynamic>> _logs = [];
   String _searchTerm = "";
+  bool _ascending = false; // false = terbaru dulu
+  RealtimeChannel? _channel;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLogs();
+    _subscribeLogs();
+  }
+
+  Future<void> _loadLogs() async {
+    final logs = await SupabaseService.getLogs();
+    setState(() {
+      _logs = logs;
+    });
+  }
+
+  void _subscribeLogs() {
+    _channel = Supabase.instance.client.channel('realtime-log_aktivitas');
+
+    _channel!.onPostgresChanges(
+      schema: 'public',
+      table: 'log_aktivitas',
+      event: PostgresChangeEvent.insert,
+      callback: (payload) {
+        debugPrint('🔔 Log baru masuk: ${payload.newRecord}');
+        _loadLogs();
+      },
+    );
+
+    _channel!.subscribe();
+  }
+
+  @override
+  void dispose() {
+    _channel?.unsubscribe();
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final filteredLogs = _logs.where((log) {
+    // filter
+    var filteredLogs = _logs.where((log) {
       final query = _searchTerm.toLowerCase();
-      return log.user.toLowerCase().contains(query) ||
-          log.description.toLowerCase().contains(query);
+      final username = (log['username'] ?? '').toString().toLowerCase();
+      final description = (log['aksi'] ?? '').toString().toLowerCase();
+      return username.contains(query) || description.contains(query);
     }).toList();
+
+    // sort by created_at
+    filteredLogs.sort((a, b) {
+      final dateA = DateTime.tryParse(a['created_at'] ?? '') ?? DateTime(2000);
+      final dateB = DateTime.tryParse(b['created_at'] ?? '') ?? DateTime(2000);
+      return _ascending ? dateA.compareTo(dateB) : dateB.compareTo(dateA);
+    });
 
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Log Aktivitas'),
-      backgroundColor: theme.colorScheme.background,
       drawer: const SideMenu(),
+      backgroundColor: theme.colorScheme.background,
       body: ListView(
         padding: const EdgeInsets.all(14),
         children: [
@@ -125,9 +99,9 @@ class _LogsPageState extends State<LogsPage> {
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // TABLE
+          // TABLE CARD (header + table dalam 1 card)
           Card(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -136,31 +110,101 @@ class _LogsPageState extends State<LogsPage> {
             elevation: 2,
             child: Padding(
               padding: const EdgeInsets.all(14),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  headingRowColor: WidgetStateProperty.all(theme.scaffoldBackgroundColor),
-                  columns: const [
-                    DataColumn(label: Text('Username')),
-                    DataColumn(label: Text('Deskripsi')),
-                    DataColumn(label: Text('Tanggal')),
-                  ],
-                  rows: filteredLogs.map((log) {
-                    return DataRow(cells: [
-                      DataCell(Text(log.user)),
-                      DataCell(
-                        SizedBox(
-                          width: 450,
-                          child: Text(
-                            log.description,
-                            overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // HEADER dalam card
+                  Row(
+                    children: [
+                      Text(
+                        'History',
+                        style: theme.textTheme.headlineSmall,
+                      ),
+                      const Spacer(),
+
+                      Tooltip(
+                        message: _ascending
+                            ? 'Urut: Tertua → Terbaru'
+                            : 'Urut: Terbaru → Tertua',
+                        child: Material(
+                          color: theme.colorScheme.surface,
+                          borderRadius: BorderRadius.circular(10),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: () => setState(() => _ascending = !_ascending),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 7,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.grey.shade300),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.sort, size: 18),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _ascending ? "Tertua" : "Terbaru",
+                                    style: theme.textTheme.bodyLarge,
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                      DataCell(Text(log.timestamp)),
-                    ]);
-                  }).toList(),
-                ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 10),
+                  const SizedBox(height: 10),
+
+                  // TABLE
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      headingRowColor: WidgetStateProperty.all(
+                        theme.scaffoldBackgroundColor,
+                      ),
+                      columns: const [
+                        DataColumn(label: Text('Username')),
+                        DataColumn(label: Text('Deskripsi')),
+                        DataColumn(label: Text('Tanggal')),
+                      ],
+                      rows: filteredLogs.map((log) {
+                        // format tanggal
+                        String formattedDate = '';
+                        final rawDate = log['created_at'];
+                        if (rawDate != null) {
+                          final dt = DateTime.tryParse(rawDate);
+                          if (dt != null) {
+                            formattedDate =
+                                DateFormat('dd/MM/yyyy HH:mm').format(dt);
+                          }
+                        }
+
+                        return DataRow(
+                          cells: [
+                            DataCell(Text(log['username'] ?? '')),
+                            DataCell(
+                              SizedBox(
+                                width: 450,
+                                child: Text(
+                                  log['aksi'] ?? '',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                            DataCell(Text(formattedDate)),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

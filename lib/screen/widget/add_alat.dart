@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -33,7 +33,7 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
   bool perbaikanError = false;
   bool imageError = false;
 
-  bool _isSubmitting = false; // ✅ prevent double submit
+  bool _isSubmitting = false;
 
   final _radius = BorderRadius.circular(8);
 
@@ -42,10 +42,21 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
         borderSide: const BorderSide(color: Color(0xFF6B7280), width: 1.5),
       );
 
+  @override
+  void dispose() {
+    nameController.dispose();
+    dendaController.dispose();
+    perbaikanController.dispose();
+    super.dispose();
+  }
+
   // ================= PICK IMAGE =================
   Future<void> _pickImage() async {
+    if (_isSubmitting) return;
+
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
+
     if (picked != null) {
       final bytes = await picked.readAsBytes();
       setState(() {
@@ -102,11 +113,12 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
   }
 
   // ================= SUBMIT =================
-  void _submit() async {
-    if (_isSubmitting) return; // ✅ prevent double submit
-    _isSubmitting = true;
+  Future<void> _submit() async {
+    if (_isSubmitting) return;
 
     setState(() {
+      _isSubmitting = true;
+
       nameError = nameController.text.trim().isEmpty;
       categoryError = selectedCategoryId == null;
       dendaError = dendaController.text.trim().isEmpty ||
@@ -117,66 +129,73 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
     });
 
     if (nameError || categoryError || dendaError || perbaikanError || imageError) {
-      _isSubmitting = false;
+      if (mounted) setState(() => _isSubmitting = false);
       return;
     }
 
-    final selectedCategory =
-        widget.categories.firstWhere((c) => c.id == selectedCategoryId);
+    final namaInput = nameController.text.trim();
 
-    // ================= CEK NAMA ALAT SUDAH ADA =================
-    final allAlat = await sbs.SupabaseService().getAlat();
-    if (allAlat.any((a) => a.namaAlat.toLowerCase() == nameController.text.trim().toLowerCase())) {
-      setState(() {
-        nameError = true;
-      });
-      _isSubmitting = false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Nama alat sudah ada! Gunakan nama lain.")),
-      );
-      return;
-    }
-
-    // ================= UPLOAD FOTO =================
-    String imageUrl = '';
-    if (imageBytes != null) {
-      try {
-        imageUrl = await sbs.SupabaseService.uploadFoto(
-            imageBytes!, nameController.text.trim());
-      } catch (e) {
-        debugPrint('❌ Upload foto gagal: $e');
-        _isSubmitting = false;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Gagal upload foto")),
-        );
-        return;
-      }
-    }
-
-    // pastikan foto_url tidak null
-    if (imageUrl.isEmpty) imageUrl = '';
-
-    // ================= INSERT ALAT =================
     try {
+      final selectedCategory =
+          widget.categories.firstWhere((c) => c.id == selectedCategoryId);
+
+      // ================= INSERT ALAT DULU (tanpa foto) =================
+      // kalau duplicate nama -> error di sini, jadi FOTO TIDAK AKAN TERUPLOAD
       final alat = await sbs.SupabaseService().addAlat(
-        namaAlat: nameController.text.trim(),
+        namaAlat: namaInput,
         status: status,
         kategoriId: selectedCategory.id,
         denda: int.parse(dendaController.text.trim()),
         perbaikan: int.parse(perbaikanController.text.trim()),
-        fotoUrl: imageUrl,
+        fotoUrl: '',
+      );
+
+      // ================= UPLOAD FOTO SETELAH INSERT BERHASIL =================
+      String imageUrl = '';
+      if (imageBytes != null) {
+        imageUrl = await sbs.SupabaseService.uploadFoto(imageBytes!, namaInput);
+      }
+
+      // ================= UPDATE FOTO_URL =================
+      final updatedAlat = await sbs.SupabaseService().editAlat(
+        id: alat.id,
+        namaAlat: alat.namaAlat,
+        status: alat.status,
+        kategoriId: alat.kategoriId,
+        image: imageUrl,
+        denda: alat.denda,
+        perbaikan: alat.perbaikan,
       );
 
       if (!mounted) return;
-      Navigator.pop(context, alat);
+
+      Navigator.pop(context, updatedAlat);
       _showSuccessPopup();
+    } on PostgrestException catch (e) {
+      debugPrint('❌ Gagal tambah alat: ${e.message}');
+
+      if (!mounted) return;
+
+      // duplicate key
+      if (e.code == '23505') {
+        setState(() => nameError = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Nama alat sudah ada! Gunakan nama lain.")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Gagal tambah alat: ${e.message}")),
+        );
+      }
     } catch (e) {
       debugPrint('❌ Gagal tambah alat: $e');
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Gagal tambah alat")),
       );
     } finally {
-      _isSubmitting = false;
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -195,11 +214,13 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(child: Text("Tambah Alat", style: theme.textTheme.headlineSmall)),
+              Center(
+                child: Text("Tambah Alat", style: theme.textTheme.headlineSmall),
+              ),
               const SizedBox(height: 16),
 
               _label("Nama Alat"),
-              _textField(nameController),
+              _textField(nameController, enabled: !_isSubmitting),
               if (nameError) _error("Nama alat wajib diisi atau sudah ada"),
               const SizedBox(height: 12),
 
@@ -210,11 +231,12 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
 
               _label("Foto Alat"),
               _uploadButton(),
+              if (imageError) _error("Foto wajib diupload"),
               const SizedBox(height: 12),
 
               _label("Status"),
               DropdownButtonFormField<String>(
-                value: status,
+                initialValue: status,
                 decoration: InputDecoration(
                   border: _border,
                   enabledBorder: _border,
@@ -225,17 +247,19 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
                   DropdownMenuItem(value: "Dipinjam", child: Text("Dipinjam")),
                   DropdownMenuItem(value: "Rusak", child: Text("Rusak")),
                 ],
-                onChanged: (v) => setState(() => status = v ?? 'Tersedia'),
+                onChanged: _isSubmitting
+                    ? null
+                    : (v) => setState(() => status = v ?? 'Tersedia'),
               ),
               const SizedBox(height: 12),
 
               _label("Biaya Denda"),
-              _textField(dendaController, isNumber: true),
+              _textField(dendaController, isNumber: true, enabled: !_isSubmitting),
               if (dendaError) _error("Denda wajib diisi dan berupa angka"),
               const SizedBox(height: 12),
 
               _label("Biaya Perbaikan"),
-              _textField(perbaikanController, isNumber: true),
+              _textField(perbaikanController, isNumber: true, enabled: !_isSubmitting),
               if (perbaikanError) _error("Perbaikan wajib diisi dan berupa angka"),
               const SizedBox(height: 20),
 
@@ -243,14 +267,22 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _submit,
+                      onPressed: _isSubmitting ? null : _submit,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: theme.colorScheme.primary,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      child: const Text("Tambah"),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text("Tambah"),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -261,8 +293,11 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Batal', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                      child: const Text(
+                        'Batal',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],
@@ -279,9 +314,14 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
         child: Text(text),
       );
 
-  Widget _textField(TextEditingController controller, {bool isNumber = false}) {
+  Widget _textField(
+    TextEditingController controller, {
+    bool isNumber = false,
+    bool enabled = true,
+  }) {
     return TextField(
       controller: controller,
+      enabled: enabled,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       decoration: InputDecoration(
         border: _border,
@@ -293,7 +333,7 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
 
   Widget _categoryDropdown() {
     return DropdownButtonFormField<String>(
-      value: selectedCategoryId,
+      initialValue: selectedCategoryId,
       hint: const Text("Pilih kategori"),
       decoration: InputDecoration(
         border: _border,
@@ -303,16 +343,18 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
       items: widget.categories
           .map((c) => DropdownMenuItem<String>(value: c.id, child: Text(c.name)))
           .toList(),
-      onChanged: (v) => setState(() {
-        selectedCategoryId = v;
-        categoryError = false;
-      }),
+      onChanged: _isSubmitting
+          ? null
+          : (v) => setState(() {
+                selectedCategoryId = v;
+                categoryError = false;
+              }),
     );
   }
 
   Widget _uploadButton() {
     return ElevatedButton.icon(
-      onPressed: _pickImage,
+      onPressed: _isSubmitting ? null : _pickImage,
       icon: const Icon(Icons.photo),
       label: Text((imageFile != null || imageBytes != null) ? "Ganti Foto" : "Upload Foto"),
     );
@@ -320,6 +362,9 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
 
   Widget _error(String text) => Padding(
         padding: const EdgeInsets.only(top: 4),
-        child: Text(text, style: const TextStyle(color: Colors.red, fontSize: 11)),
+        child: Text(
+          text,
+          style: const TextStyle(color: Colors.red, fontSize: 11),
+        ),
       );
 }

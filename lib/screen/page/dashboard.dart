@@ -347,11 +347,6 @@ class _DashboardPageState extends State<DashboardPage> {
                               style: theme.textTheme.headlineSmall,
                             ),
                           ),
-                          IconButton(
-                            onPressed: () => _loadDashboard(silent: false),
-                            icon: const Icon(Icons.refresh),
-                            tooltip: 'Refresh',
-                          ),
                         ],
                       ),
                       const SizedBox(height: 16),

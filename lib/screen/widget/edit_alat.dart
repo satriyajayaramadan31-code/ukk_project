@@ -1,10 +1,14 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
 import '../utils/theme.dart';
 import 'package:engine_rent_app/service/supabase_service.dart';
 
 class EditAlatDialog extends StatefulWidget {
   final Alat alat;
-  final List<Category> categories; // pakai objek Category supaya bisa id & name
+  final List<Category> categories;
 
   const EditAlatDialog({
     super.key,
@@ -17,20 +21,25 @@ class EditAlatDialog extends StatefulWidget {
 }
 
 class _EditAlatDialogState extends State<EditAlatDialog> {
+  final SupabaseService _service = SupabaseService();
+
   final TextEditingController nameController = TextEditingController();
   final TextEditingController dendaController = TextEditingController();
   final TextEditingController perbaikanController = TextEditingController();
 
   String? selectedCategoryId;
   String status = "Tersedia";
-  String? imagePath;
-  String? oldImagePath;
+
+  late String _oldFotoUrl;
+  Uint8List? _newImageBytes;
 
   bool nameError = false;
   bool categoryError = false;
   bool dendaError = false;
   bool perbaikanError = false;
   bool imageError = false;
+
+  bool _submitting = false;
 
   final _radius = BorderRadius.circular(8);
 
@@ -46,14 +55,21 @@ class _EditAlatDialogState extends State<EditAlatDialog> {
   void initState() {
     super.initState();
 
-    // pre-fill data
     nameController.text = widget.alat.namaAlat;
     dendaController.text = widget.alat.denda.toString();
     perbaikanController.text = widget.alat.perbaikan.toString();
     selectedCategoryId = widget.alat.kategoriId;
     status = widget.alat.status;
-    imagePath = widget.alat.fotoUrl;
-    oldImagePath = widget.alat.fotoUrl;
+
+    _oldFotoUrl = widget.alat.fotoUrl;
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    dendaController.dispose();
+    perbaikanController.dispose();
+    super.dispose();
   }
 
   void _showSuccessPopup() {
@@ -63,9 +79,7 @@ class _EditAlatDialogState extends State<EditAlatDialog> {
       useRootNavigator: true,
       builder: (context) {
         return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -98,33 +112,111 @@ class _EditAlatDialogState extends State<EditAlatDialog> {
     });
   }
 
-  void _submit() {
+  void _validate() {
     setState(() {
       nameError = nameController.text.trim().isEmpty;
       categoryError = selectedCategoryId == null;
-      dendaError = dendaController.text.trim().isEmpty || int.tryParse(dendaController.text.trim()) == null;
-      perbaikanError = perbaikanController.text.trim().isEmpty || int.tryParse(perbaikanController.text.trim()) == null;
-      imageError = imagePath == null || imagePath!.isEmpty;
+
+      dendaError = dendaController.text.trim().isEmpty ||
+          int.tryParse(dendaController.text.trim()) == null;
+
+      perbaikanError = perbaikanController.text.trim().isEmpty ||
+          int.tryParse(perbaikanController.text.trim()) == null;
+
+      // foto wajib: kalau tidak ada foto lama, harus pilih foto baru
+      final hasOld = _oldFotoUrl.isNotEmpty;
+      final hasNew = _newImageBytes != null;
+      imageError = !(hasOld || hasNew);
     });
+  }
 
-    if (nameError || categoryError || dendaError || perbaikanError || imageError) return;
+  Future<void> _pickNewPhoto() async {
+    try {
+      final picker = ImagePicker();
+      final XFile? picked = await picker.pickImage(source: ImageSource.gallery);
+      if (picked == null) return;
 
-    final result = Alat(
-      id: widget.alat.id,
-      namaAlat: nameController.text.trim(),
-      kategoriId: selectedCategoryId!,
-      kategoriNama: widget.categories.firstWhere((c) => c.id == selectedCategoryId!).name,
-      fotoUrl: imagePath!,
-      status: status,
-      denda: int.parse(dendaController.text.trim()),
-      perbaikan: int.parse(perbaikanController.text.trim()),
-    );
+      final bytes = await picked.readAsBytes();
 
-    Navigator.pop(context, result);
+      setState(() {
+        _newImageBytes = bytes;
+        imageError = false;
+      });
+    } catch (e) {
+      debugPrint("❌ Gagal pilih foto: $e");
+    }
+  }
 
-    Future.microtask(() {
-      if (mounted) _showSuccessPopup();
-    });
+  // bikin nama file unik biar tidak ketimpa/hilang
+  String _buildUniqueFileName() {
+    final safeName = nameController.text
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'[^a-z0-9_]+'), '');
+
+    // unik per alat
+    return '${safeName}_${widget.alat.id}';
+  }
+
+  Future<void> _submit() async {
+    if (_submitting) return;
+
+    _validate();
+    if (nameError || categoryError || dendaError || perbaikanError || imageError) {
+      return;
+    }
+
+    setState(() => _submitting = true);
+
+    try {
+      String finalFotoUrl = _oldFotoUrl;
+
+      // kalau user pilih foto baru -> HAPUS DULU lalu UPLOAD baru
+      if (_newImageBytes != null) {
+        // 1) hapus foto lama dulu
+        if (_oldFotoUrl.isNotEmpty) {
+          await _service.deleteFoto(_oldFotoUrl);
+        }
+
+        // 2) upload foto baru (file name unik)
+        final uploadedUrl = await SupabaseService.uploadFoto(
+          _newImageBytes!,
+          _buildUniqueFileName(),
+        );
+
+        // 3) pakai url baru
+        finalFotoUrl = uploadedUrl;
+      }
+
+      // 4) update tabel alat (ganti url baru)
+      final updated = await _service.editAlat(
+        id: widget.alat.id,
+        namaAlat: nameController.text.trim(),
+        status: status,
+        kategoriId: selectedCategoryId!,
+        image: finalFotoUrl,
+        denda: int.parse(dendaController.text.trim()),
+        perbaikan: int.parse(perbaikanController.text.trim()),
+      );
+
+      if (!mounted) return;
+
+      Navigator.pop(context, updated);
+
+      Future.microtask(() {
+        if (mounted) _showSuccessPopup();
+      });
+    } catch (e) {
+      debugPrint("❌ Edit alat gagal: $e");
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Gagal memperbarui alat: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -161,7 +253,7 @@ class _EditAlatDialogState extends State<EditAlatDialog> {
 
               _label("Status"),
               DropdownButtonFormField<String>(
-                value: status,
+                initialValue: status,
                 decoration: InputDecoration(
                   border: _border,
                   enabledBorder: _border,
@@ -172,7 +264,7 @@ class _EditAlatDialogState extends State<EditAlatDialog> {
                   DropdownMenuItem(value: "Dipinjam", child: Text("Dipinjam")),
                   DropdownMenuItem(value: "Rusak", child: Text("Rusak")),
                 ],
-                onChanged: (v) => setState(() => status = v!),
+                onChanged: _submitting ? null : (v) => setState(() => status = v!),
               ),
               const SizedBox(height: 12),
 
@@ -190,14 +282,14 @@ class _EditAlatDialogState extends State<EditAlatDialog> {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _submit,
+                      onPressed: _submitting ? null : _submit,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: theme.colorScheme.primary,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      child: const Text("Simpan"),
+                      child: Text(_submitting ? "Menyimpan..." : "Simpan"),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -208,8 +300,11 @@ class _EditAlatDialogState extends State<EditAlatDialog> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Batal', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      onPressed: _submitting ? null : () => Navigator.pop(context),
+                      child: const Text(
+                        'Batal',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],
@@ -221,11 +316,13 @@ class _EditAlatDialogState extends State<EditAlatDialog> {
     );
   }
 
-  Widget _label(String text) => Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(text));
+  Widget _label(String text) =>
+      Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(text));
 
   Widget _textField(TextEditingController controller, {bool isNumber = false}) {
     return TextField(
       controller: controller,
+      enabled: !_submitting,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       decoration: InputDecoration(
         border: _border,
@@ -237,7 +334,7 @@ class _EditAlatDialogState extends State<EditAlatDialog> {
 
   Widget _categoryDropdown() {
     return DropdownButtonFormField<String>(
-      value: selectedCategoryId,
+      initialValue: selectedCategoryId,
       hint: const Text("Pilih kategori"),
       decoration: InputDecoration(
         border: _border,
@@ -247,24 +344,22 @@ class _EditAlatDialogState extends State<EditAlatDialog> {
       items: widget.categories
           .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
           .toList(),
-      onChanged: (v) => setState(() {
-        selectedCategoryId = v;
-        categoryError = false;
-      }),
+      onChanged: _submitting
+          ? null
+          : (v) => setState(() {
+                selectedCategoryId = v;
+                categoryError = false;
+              }),
     );
   }
 
   Widget _uploadButton() {
+    final hasNew = _newImageBytes != null;
+
     return ElevatedButton.icon(
-      onPressed: () {
-        setState(() {
-          // ganti foto lama dengan yang baru (dummy placeholder)
-          imagePath = "uploaded_image_placeholder.jpg";
-          imageError = false;
-        });
-      },
+      onPressed: _submitting ? null : _pickNewPhoto,
       icon: const Icon(Icons.photo),
-      label: Text(imagePath == null ? "Upload Foto" : "Ganti Foto"),
+      label: Text(hasNew ? "Foto Baru Dipilih" : "Ganti Foto"),
     );
   }
 

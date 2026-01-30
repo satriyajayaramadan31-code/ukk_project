@@ -18,8 +18,8 @@ class Alat {
   final String namaAlat;
   final String fotoUrl;
   final String status;
-  final String kategoriId; // FK ke tabel kategori_alat
-  final String kategoriNama; // Untuk UI
+  final String kategoriId;
+  final String kategoriNama;
   final int denda;
   final int perbaikan;
 
@@ -34,7 +34,7 @@ class Alat {
     required this.kategoriNama,
     required this.denda,
     required this.perbaikan,
-    this.bytes
+    this.bytes,
   });
 
   factory Alat.fromMap(Map<String, dynamic> json) {
@@ -52,7 +52,6 @@ class Alat {
     );
   }
 }
-
 
 class SupabaseService {
   static final SupabaseClient _client = Supabase.instance.client;
@@ -105,66 +104,22 @@ class SupabaseService {
     }
   }
 
-  // ================= LOGIN =================
-  static Future<Map<String, dynamic>> login({
-    required String username,
-    required String password,
-  }) async {
-    try {
-      debugPrint('🟡 LOGIN: $username');
-
-      final user = await _client
-          .from('user')
-          .select('id, password, role, token, username')
-          .eq('username', username)
-          .maybeSingle();
-
-      debugPrint('🟢 DB RESULT: $user');
-
-      if (user == null) return {'success': false, 'message': 'Username salah'};
-
-      if ((user['password'] ?? '').toString() != password) {
-        return {'success': false, 'message': 'Password salah'};
-      }
-
-      await _deleteToken();
-      await _writeToken((user['token'] ?? '').toString());
-
-      debugPrint('✅ LOGIN BERHASIL');
-
-      return {
-        'success': true,
-        'message': 'Login berhasil',
-        'role': user['role'],
-        'username': user['username'],
-      };
-    } on PostgrestException catch (e) {
-      debugPrint('❌ SUPABASE ERROR: ${e.message}');
-      return {'success': false, 'message': e.message};
-    } catch (e, stack) {
-      debugPrint('❌ LOGIN ERROR: $e');
-      debugPrint(stack.toString());
-      return {
-        'success': false,
-        'message': 'Terjadi kesalahan (lihat terminal)',
-      };
-    }
-  }
-
-  // ================= AUTH CHECK =================
-  static Future<bool> isLoggedIn() async {
+  // ================= AUTH HELPERS =================
+  static Future<int?> getUserId() async {
     try {
       final token = await _readToken();
-      if (token == null) return false;
+      if (token == null) return null;
 
       final user =
           await _client.from('user').select('id').eq('token', token).maybeSingle();
 
-      debugPrint('🔍 AUTH CHECK: $user');
-      return user != null;
+      final id = user?['id'];
+      if (id == null) return null;
+
+      return (id is int) ? id : int.tryParse(id.toString());
     } catch (e) {
-      debugPrint('❌ AUTH CHECK ERROR: $e');
-      return false;
+      debugPrint('❌ GET USER ID ERROR: $e');
+      return null;
     }
   }
 
@@ -201,21 +156,111 @@ class SupabaseService {
     }
   }
 
-  static Future<int?> getUserId() async {
+  // ================= LOG AKTIVITAS =================
+
+  /// Insert log otomatis pakai userId dari token (user yang login).
+  static Future<void> insertLog({
+    required String description,
+    int? userId,
+  }) async {
+    try {
+      final uid = userId ?? await getUserId();
+      if (uid == null) {
+        debugPrint('⚠️ insertLog dibatalkan: userId null (belum login?)');
+        return;
+      }
+
+      await _client.from('log_aktivitas').insert({
+        'name': uid, // FK user.id
+        'aksi': '$description',
+      });
+
+      debugPrint('✅ Log ditambahkan: ($uid) $description');
+    } catch (e) {
+      debugPrint('❌ Gagal menambahkan log: $e');
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getLogs() async {
+    try {
+      final res = await _client
+          .from('v_log_aktivitas')
+          .select('*')
+          .order('created_at', ascending: false);
+
+      return List<Map<String, dynamic>>.from(res);
+    } catch (e) {
+      debugPrint('❌ GET LOGS ERROR: $e');
+      return [];
+    }
+  }
+
+  // ================= LOGIN =================
+  static Future<Map<String, dynamic>> login({
+    required String username,
+    required String password,
+  }) async {
+    try {
+      debugPrint('🟡 LOGIN: $username');
+
+      final user = await _client
+          .from('user')
+          .select('id, password, role, token, username')
+          .eq('username', username)
+          .maybeSingle();
+
+      debugPrint('🟢 DB RESULT: $user');
+
+      if (user == null) return {'success': false, 'message': 'Username salah'};
+
+      if ((user['password'] ?? '').toString() != password) {
+        return {'success': false, 'message': 'Password salah'};
+      }
+
+      await _deleteToken();
+      await _writeToken((user['token'] ?? '').toString());
+
+      // ✅ log login
+      final uid = (user['id'] is int) ? user['id'] : int.tryParse(user['id'].toString());
+      if (uid != null) {
+        await insertLog(description: 'Login', userId: uid);
+      }
+
+      debugPrint('✅ LOGIN BERHASIL');
+
+      return {
+        'success': true,
+        'message': 'Login berhasil',
+        'role': user['role'],
+        'username': user['username'],
+      };
+    } on PostgrestException catch (e) {
+      debugPrint('❌ SUPABASE ERROR: ${e.message}');
+      return {'success': false, 'message': e.message};
+    } catch (e, stack) {
+      debugPrint('❌ LOGIN ERROR: $e');
+      debugPrint(stack.toString());
+      return {
+        'success': false,
+        'message': 'Terjadi kesalahan (lihat terminal)',
+      };
+    }
+  }
+
+  // ================= AUTH CHECK =================
+  static Future<bool> isLoggedIn() async {
     try {
       final token = await _readToken();
-      if (token == null) return null;
+      if (token == null) return false;
 
       final user =
           await _client.from('user').select('id').eq('token', token).maybeSingle();
 
-      final id = user?['id'];
-      if (id == null) return null;
-
-      return (id is int) ? id : int.tryParse(id.toString());
+      debugPrint('🔍 AUTH CHECK: $user');
+      return user != null;
     } catch (e) {
-      debugPrint('❌ GET USER ID ERROR: $e');
-      return null;
+      debugPrint('❌ AUTH CHECK ERROR: $e');
+      return false;
     }
   }
 
@@ -278,7 +323,12 @@ class SupabaseService {
       };
     } catch (e) {
       debugPrint('❌ DASHBOARD STATS ERROR: $e');
-      return {'totalEquipment': 0, 'activeLoans': 0, 'pendingApprovals': 0, 'overdueReturns': 0};
+      return {
+        'totalEquipment': 0,
+        'activeLoans': 0,
+        'pendingApprovals': 0,
+        'overdueReturns': 0
+      };
     }
   }
 
@@ -331,14 +381,21 @@ class SupabaseService {
     }
   }
 
-  static Future<bool> addUser(
-      {required String username, required String password, required String role}) async {
+  static Future<bool> addUser({
+    required String username,
+    required String password,
+    required String role,
+  }) async {
     try {
       await _client.from('user').insert({
         'username': username,
         'password': password,
         'role': role,
       });
+
+      // ✅ log
+      await insertLog(description: 'Membuat User $username');
+
       debugPrint('✅ ADD USER SUCCESS');
       return true;
     } catch (e) {
@@ -347,14 +404,31 @@ class SupabaseService {
     }
   }
 
-  static Future<bool> editUser(
-      {required int id, required String username, required String password, required String role}) async {
+  static Future<bool> editUser({
+    required int id,
+    required String username,
+    required String password,
+    required String role,
+  }) async {
     try {
+      // ambil username lama untuk log biar sesuai permintaan: "Mengedit $user"
+      final before = await _client
+          .from('user')
+          .select('username')
+          .eq('id', id)
+          .maybeSingle();
+
+      final oldUsername = before?['username']?.toString() ?? username;
+
       await _client.from('user').update({
         'username': username,
         'password': password,
         'role': role,
       }).eq('id', id);
+
+      // ✅ log
+      await insertLog(description: 'Mengedit User $oldUsername');
+
       debugPrint('✅ EDIT USER SUCCESS');
       return true;
     } catch (e) {
@@ -365,7 +439,19 @@ class SupabaseService {
 
   static Future<bool> deleteUser({required int id}) async {
     try {
+      // ambil username untuk log
+      final before = await _client
+          .from('user')
+          .select('username')
+          .eq('id', id)
+          .maybeSingle();
+      final uname = before?['username']?.toString() ?? 'User#$id';
+
       await _client.from('user').delete().eq('id', id);
+
+      // ✅ log
+      await insertLog(description: 'Menghapus User $uname');
+
       debugPrint('✅ DELETE USER SUCCESS');
       return true;
     } catch (e) {
@@ -376,7 +462,8 @@ class SupabaseService {
 
   // ================= CATEGORY MANAGEMENT =================
   Future<List<Category>> getCategories() async {
-    final response = await _client.from('kategori_alat').select().order('id', ascending: true);
+    final response =
+        await _client.from('kategori_alat').select().order('id', ascending: true);
 
     final data = response as List<dynamic>;
     return data.map((e) {
@@ -388,52 +475,89 @@ class SupabaseService {
   }
 
   Future<Category> addCategory(String name) async {
-    final response = await _client.from('kategori_alat').insert({'kategori': name}).select().single();
-    final data = response;
+    final response = await _client
+        .from('kategori_alat')
+        .insert({'kategori': name})
+        .select()
+        .single();
+
+    // ✅ log
+    await SupabaseService.insertLog(description: 'Menambah kategori $name');
+
     return Category(
-      id: data['id'].toString(),
-      name: data['kategori'],
+      id: response['id'].toString(),
+      name: response['kategori'],
     );
   }
 
   Future<Category> editCategory(String id, String name) async {
+    // ambil nama lama untuk log
+    final before = await _client
+        .from('kategori_alat')
+        .select('kategori')
+        .eq('id', id)
+        .maybeSingle();
+    final oldName = before?['kategori']?.toString() ?? name;
+
     final response = await _client
         .from('kategori_alat')
         .update({'kategori': name})
         .eq('id', id)
         .select()
         .single();
-    final data = response;
+
+    // ✅ log
+    await SupabaseService.insertLog(description: 'Mengedit kategori $oldName');
+
     return Category(
-      id: data['id'].toString(),
-      name: data['kategori'],
+      id: response['id'].toString(),
+      name: response['kategori'],
     );
   }
 
   Future<void> deleteCategory(String id) async {
+    // ambil nama kategori untuk log
+    final before = await _client
+        .from('kategori_alat')
+        .select('kategori')
+        .eq('id', id)
+        .maybeSingle();
+    final name = before?['kategori']?.toString() ?? 'Kategori#$id';
+
     await _client.from('kategori_alat').delete().eq('id', id);
+
+    // ✅ log
+    await SupabaseService.insertLog(description: 'Menghapus kategori $name');
   }
 
   Future<int> countItemsInCategory(String categoryId) async {
-    // Ambil data dari tabel 'alat' sesuai kategori
     final response = await _client
         .from('alat')
-        .select('id') // cuma ambil kolom id
+        .select('id')
         .eq('kategori', categoryId)
-        .limit(1000); // opsional, batasi jumlah jika banyak data
+        .limit(1000);
 
-    // response adalah List<dynamic>
     final data = response as List<dynamic>? ?? [];
     return data.length;
   }
 
-
   // ================= ALAT =================
 
   static Future<String> uploadFoto(Uint8List bytes, String fileName) async {
-    final filePath = '$fileName.${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final safeName = fileName
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'[^a-z0-9_]+'), '');
+
+    final filePath = '$safeName.jpg';
+
     try {
-      await _client.storage.from('Image').uploadBinary(filePath, bytes, fileOptions: const FileOptions(upsert: true));
+      await _client.storage.from('Image').uploadBinary(
+            filePath,
+            bytes,
+            fileOptions: const FileOptions(upsert: true),
+          );
       return _client.storage.from('Image').getPublicUrl(filePath);
     } catch (e) {
       debugPrint('❌ Upload foto gagal: $e');
@@ -454,7 +578,6 @@ class SupabaseService {
 
   Future<List<Alat>> getAlat() async {
     try {
-      // Ambil alat beserta kategori
       final res = await _client
           .from('alat')
           .select('*, kategori_alat(*)')
@@ -484,50 +607,287 @@ class SupabaseService {
       'perbaikan': perbaikan,
       'foto_url': fotoUrl,
     }).select().single();
+
+    // ✅ log
+    await SupabaseService.insertLog(description: 'Menambah Alat $namaAlat');
+
     return Alat.fromMap(res);
   }
 
-Future<Alat> editAlat({
-  required String id,
-  required String namaAlat,
-  required String status,
-  required String kategoriId,
-  required String image,
-  required int denda,
-  required int perbaikan,
-}) async {
-  final res = await _client.from('alat').update({
-    'nama_alat': namaAlat,
-    'status': status,
-    'kategori': kategoriId,
-    'foto_url': image,
-    'denda': denda,
-    'perbaikan': perbaikan,
-  }).eq('id', id).select().single();
+  Future<Alat> editAlat({
+    required String id,
+    required String namaAlat,
+    required String status,
+    required String kategoriId,
+    required String image,
+    required int denda,
+    required int perbaikan,
+  }) async {
+    // ambil nama lama untuk log
+    final before = await _client
+        .from('alat')
+        .select('nama_alat')
+        .eq('id', id)
+        .maybeSingle();
+    final oldName = before?['nama_alat']?.toString() ?? namaAlat;
 
-  return Alat.fromMap(res);
-}
+    final res = await _client.from('alat').update({
+      'nama_alat': namaAlat,
+      'status': status,
+      'kategori': kategoriId,
+      'foto_url': image,
+      'denda': denda,
+      'perbaikan': perbaikan,
+    }).eq('id', id).select().single();
 
-Future<void> deleteAlat(String id, {String? fotoUrl}) async {
-  try {
-    // 1. Hapus foto jika ada
-    if (fotoUrl != null && fotoUrl.isNotEmpty) {
-      await deleteFoto(fotoUrl);
-    }
+    // ✅ log
+    await SupabaseService.insertLog(description: 'Mengedit Alat $oldName');
 
-    // 2. Hapus record alat di database
-    await _client.from('alat').delete().eq('id', id);
-
-    debugPrint('✅ Alat $id berhasil dihapus');
-  } catch (e) {
-    debugPrint('❌ Gagal hapus alat $id: $e');
-    throw e;
+    return Alat.fromMap(res);
   }
-}
+
+  Future<void> deleteAlat(String id, {String? fotoUrl}) async {
+    try {
+      // ambil nama alat untuk log
+      final before = await _client
+          .from('alat')
+          .select('nama_alat')
+          .eq('id', id)
+          .maybeSingle();
+      final name = before?['nama_alat']?.toString() ?? 'Alat#$id';
+
+      // 1) hapus foto
+      if (fotoUrl != null && fotoUrl.isNotEmpty) {
+        await deleteFoto(fotoUrl);
+      }
+
+      // 2) hapus record
+      await _client.from('alat').delete().eq('id', id);
+
+      // ✅ log
+      await SupabaseService.insertLog(description: 'Menghapus Alat $name');
+
+      debugPrint('✅ Alat $id berhasil dihapus');
+    } catch (e) {
+      debugPrint('❌ Gagal hapus alat $id: $e');
+      throw e;
+    }
+  }
+
+  // ================= PEMINJAMAN =================
+
+  static Future<List<Map<String, dynamic>>> getPeminjaman({
+    required String role,
+  }) async {
+    try {
+      final userId = await getUserId();
+
+      final selectQuery = _client.from('peminjaman').select('''
+        id,
+        status,
+        tanggal_pinjam,
+        tanggal_kembali,
+        tanggal_pengembalian,
+        alasan,
+        terlambat,
+        rusak,
+        denda,
+        user:user ( id, username ),
+        alat:alat ( id, nama_alat )
+      ''');
+
+      final res = (role == 'Peminjam' && userId != null)
+          ? await selectQuery.eq('user', userId).order('created_at', ascending: false)
+          : await selectQuery.order('created_at', ascending: false);
+
+      final list = List<Map<String, dynamic>>.from(res);
+
+      return list.map((e) {
+        return {
+          'id': e['id'],
+          'status': e['status'],
+          'tanggal_pinjam': e['tanggal_pinjam'],
+          'tanggal_kembali': e['tanggal_kembali'],
+          'tanggal_pengembalian': e['tanggal_pengembalian'],
+          'alasan': e['alasan'],
+          'terlambat': e['terlambat'] ?? 0,
+          'rusak': e['rusak'] ?? false,
+          'denda': e['denda'] ?? 0,
+          'user_id': e['user']?['id'],
+          'username': e['user']?['username'],
+          'alat_id': e['alat']?['id'],
+          'nama_alat': e['alat']?['nama_alat'],
+        };
+      }).toList();
+    } catch (e) {
+      debugPrint('❌ GET PEMINJAMAN ERROR: $e');
+      return [];
+    }
+  }
+
+  static Future<int?> findUserIdByUsername(String username) async {
+    try {
+      final res = await _client
+          .from('user')
+          .select('id')
+          .eq('username', username)
+          .maybeSingle();
+      if (res == null) return null;
+      return (res['id'] is int) ? res['id'] : int.tryParse(res['id'].toString());
+    } catch (e) {
+      debugPrint('❌ findUserIdByUsername ERROR: $e');
+      return null;
+    }
+  }
+
+  static Future<int?> findAlatIdByNama(String namaAlat) async {
+    try {
+      final res = await _client
+          .from('alat')
+          .select('id')
+          .eq('nama_alat', namaAlat)
+          .maybeSingle();
+      if (res == null) return null;
+      return (res['id'] is int) ? res['id'] : int.tryParse(res['id'].toString());
+    } catch (e) {
+      debugPrint('❌ findAlatIdByNama ERROR: $e');
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>> addPeminjaman({
+    required int userId,
+    required int alatId,
+    required String tanggalPinjam,
+    required String tanggalKembali,
+    String? tanggalPengembalian,
+    required String alasan,
+    required String status,
+  }) async {
+    final inserted = await _client.from('peminjaman').insert({
+      'user': userId,
+      'alat': alatId,
+      'tanggal_pinjam': tanggalPinjam,
+      'tanggal_kembali': tanggalKembali,
+      'tanggal_pengembalian': tanggalPengembalian,
+      'alasan': alasan,
+      'status': status,
+    }).select('''
+      id,
+      status,
+      tanggal_pinjam,
+      tanggal_kembali,
+      tanggal_pengembalian,
+      alasan,
+      user:user ( id, username ),
+      alat:alat ( id, nama_alat )
+    ''').single();
+
+    final namaAlat = inserted['alat']?['nama_alat']?.toString() ?? 'Alat#$alatId';
+    final namaPeminjam = inserted['user']?['username']?.toString() ?? 'User#$userId';
+
+    // ✅ log
+    await insertLog(description: 'Menambah peminjaman $namaAlat milik $namaPeminjam');
+
+    return {
+      'id': inserted['id'],
+      'status': inserted['status'],
+      'tanggal_pinjam': inserted['tanggal_pinjam'],
+      'tanggal_kembali': inserted['tanggal_kembali'],
+      'tanggal_pengembalian': inserted['tanggal_pengembalian'],
+      'alasan': inserted['alasan'],
+      'user_id': inserted['user']?['id'],
+      'username': inserted['user']?['username'],
+      'alat_id': inserted['alat']?['id'],
+      'nama_alat': inserted['alat']?['nama_alat'],
+    };
+  }
+
+  static Future<Map<String, dynamic>> editPeminjaman({
+    required dynamic id,
+    required int userId,
+    required int alatId,
+    required String tanggalPinjam,
+    required String tanggalKembali,
+    String? tanggalPengembalian,
+    required String alasan,
+    required String status,
+  }) async {
+    final updated = await _client.from('peminjaman').update({
+      'user': userId,
+      'alat': alatId,
+      'tanggal_pinjam': tanggalPinjam,
+      'tanggal_kembali': tanggalKembali,
+      'tanggal_pengembalian': tanggalPengembalian,
+      'alasan': alasan,
+      'status': status,
+    }).eq('id', id).select('''
+      id,
+      status,
+      tanggal_pinjam,
+      tanggal_kembali,
+      tanggal_pengembalian,
+      alasan,
+      user:user ( id, username ),
+      alat:alat ( id, nama_alat )
+    ''').single();
+
+    final namaAlat = updated['alat']?['nama_alat']?.toString() ?? 'Alat#$alatId';
+    final namaPeminjam = updated['user']?['username']?.toString() ?? 'User#$userId';
+
+    // ✅ log
+    await insertLog(description: 'Mengedit peminjaman $namaAlat milik $namaPeminjam');
+
+    return {
+      'id': updated['id'],
+      'status': updated['status'],
+      'tanggal_pinjam': updated['tanggal_pinjam'],
+      'tanggal_kembali': updated['tanggal_kembali'],
+      'tanggal_pengembalian': updated['tanggal_pengembalian'],
+      'alasan': updated['alasan'],
+      'user_id': updated['user']?['id'],
+      'username': updated['user']?['username'],
+      'alat_id': updated['alat']?['id'],
+      'nama_alat': updated['alat']?['nama_alat'],
+    };
+  }
+
+  static Future<void> deletePeminjaman({required dynamic id}) async {
+    // ambil data sebelum dihapus biar log lengkap
+    try {
+      final before = await _client.from('peminjaman').select('''
+        id,
+        user:user ( username ),
+        alat:alat ( nama_alat )
+      ''').eq('id', id).maybeSingle();
+
+      final namaAlat = before?['alat']?['nama_alat']?.toString() ?? 'Alat';
+      final namaPeminjam = before?['user']?['username']?.toString() ?? 'User';
+
+      await _client.from('peminjaman').delete().eq('id', id);
+
+      // ✅ log
+      await insertLog(description: 'Menghapus peminjaman $namaAlat milik $namaPeminjam');
+    } catch (e) {
+      // fallback: tetap hapus
+      await _client.from('peminjaman').delete().eq('id', id);
+      await insertLog(description: 'Menghapus peminjaman id=$id');
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getAlatList() async {
+    final res = await _client
+        .from('alat')
+        .select('id, nama_alat')
+        .order('nama_alat', ascending: true);
+
+    return List<Map<String, dynamic>>.from(res);
+  }
 
   // ================= LOGOUT =================
   static Future<void> logout() async {
     await _deleteToken();
+    await insertLog(description: 'Logout');
     debugPrint('👋 LOGOUT');
   }
 }

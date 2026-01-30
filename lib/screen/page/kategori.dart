@@ -4,7 +4,7 @@ import '../widget/side_menu.dart';
 import '../widget/add_category.dart';
 import '../widget/edit_category.dart';
 import '../widget/delete_category.dart';
-import 'package:engine_rent_app/service/supabase_service.dart'; // pastikan ini path benar
+import 'package:engine_rent_app/service/supabase_service.dart';
 
 class KategoriPage extends StatefulWidget {
   const KategoriPage({super.key});
@@ -55,7 +55,9 @@ class _KategoriPageState extends State<KategoriPage> {
     setState(() {
       _filteredCategories = query.isEmpty
           ? _categories
-          : _categories.where((c) => c.name.toLowerCase().contains(query)).toList();
+          : _categories
+              .where((c) => c.name.toLowerCase().contains(query))
+              .toList();
     });
   }
 
@@ -65,7 +67,9 @@ class _KategoriPageState extends State<KategoriPage> {
       final totalItems = await _service.countItemsInCategory(newCat.id);
 
       setState(() {
-        _categories.add(Category(id: newCat.id, name: newCat.name, totalItems: totalItems));
+        _categories.add(
+          Category(id: newCat.id, name: newCat.name, totalItems: totalItems),
+        );
         _filterCategories();
       });
     } catch (e) {
@@ -81,7 +85,11 @@ class _KategoriPageState extends State<KategoriPage> {
       setState(() {
         final index = _categories.indexWhere((c) => c.id == category.id);
         if (index != -1) {
-          _categories[index] = Category(id: edited.id, name: edited.name, totalItems: totalItems);
+          _categories[index] = Category(
+            id: edited.id,
+            name: edited.name,
+            totalItems: totalItems,
+          );
           _filterCategories();
         }
       });
@@ -103,6 +111,12 @@ class _KategoriPageState extends State<KategoriPage> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -113,29 +127,16 @@ class _KategoriPageState extends State<KategoriPage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               children: [
                 // ===== SEARCH BAR =====
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
                     labelText: 'Cari kategori',
-                    prefixIcon: Icon(Icons.search, color: theme.colorScheme.primary),
+                    prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(
-                        color: theme.colorScheme.primary.withOpacity(0.4),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(
-                        color: theme.colorScheme.primary,
-                        width: 1.5,
-                      ),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
@@ -154,7 +155,10 @@ class _KategoriPageState extends State<KategoriPage> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(50),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
+                      ),
                     ),
                     onPressed: () {
                       showDialog(
@@ -167,10 +171,13 @@ class _KategoriPageState extends State<KategoriPage> {
 
                 const SizedBox(height: 12),
 
-                // ===== DATA TABLE =====
+                // ===== TABLE =====
                 Card(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   color: theme.colorScheme.surface,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 2,
                   child: Padding(
                     padding: const EdgeInsets.all(14),
                     child: Column(
@@ -178,59 +185,72 @@ class _KategoriPageState extends State<KategoriPage> {
                       children: [
                         Text(
                           'Daftar Kategori',
-                          style: theme.textTheme.titleMedium!
-                              .copyWith(fontWeight: FontWeight.bold),
+                          style: theme.textTheme.headlineSmall,
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
+
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: DataTable(
-                            dividerThickness: 1,
-                            columnSpacing: 30,
-                            headingRowColor: MaterialStateProperty.all(theme.colorScheme.surface),
-                            border: TableBorder.all(
-                              color: Theme.of(context).dividerColor.withOpacity(0.2), // warna garis
-                              width: 1, // ketebalan
+                            columnSpacing: 32,
+                            headingRowColor: WidgetStateProperty.all(
+                              theme.scaffoldBackgroundColor,
                             ),
-                            columns: [
-                              DataColumn(label: Text('Nama', style: theme.textTheme.bodyMedium)),
-                              DataColumn(label: Text('Jumlah Alat', style: theme.textTheme.bodyMedium)),
-                              DataColumn(label: Center(child: Text('Aksi', style: theme.textTheme.bodyMedium))),
+                            columns: const [
+                              DataColumn(label: Text('Nama')),
+                              DataColumn(label: Text('Jumlah Alat')),
+                              DataColumn(label: Center(child: Text('Aksi'))),
                             ],
                             rows: _filteredCategories.map((c) {
-                              return DataRow(cells: [
-                                DataCell(Text(c.name, style: theme.textTheme.bodyMedium)),
-                                DataCell(Text('${c.totalItems} alat', style: theme.textTheme.bodyMedium)),
-                                DataCell(Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: Icon(Icons.edit, size: 18, color: theme.colorScheme.primary),
-                                      onPressed: () {
-                                        showDialog(
-                                          context: context,
-                                          builder: (_) => EditCategoryDialog(
-                                            initialName: c.name,
-                                            onSubmit: (name) => _editCategory(c, name),
+                              return DataRow(
+                                cells: [
+                                  DataCell(Text(c.name)),
+                                  DataCell(Text('${c.totalItems} alat')),
+                                  DataCell(
+                                    Center(
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: Icon(
+                                              Icons.edit,
+                                              size: 18,
+                                              color: theme.colorScheme.primary,
+                                            ),
+                                            onPressed: () {
+                                              showDialog(
+                                                context: context,
+                                                builder: (_) => EditCategoryDialog(
+                                                  initialName: c.name,
+                                                  onSubmit: (name) =>
+                                                      _editCategory(c, name),
+                                                ),
+                                              );
+                                            },
                                           ),
-                                        );
-                                      },
-                                    ),
-                                    IconButton(
-                                      icon: Icon(Icons.delete, size: 18, color: theme.colorScheme.error),
-                                      onPressed: () {
-                                        showDialog(
-                                          context: context,
-                                          builder: (_) => DeleteCategoryDialog(
-                                            categoryName: c.name,
-                                            onDelete: () => _deleteCategory(c),
+                                          const SizedBox(width: 8),
+                                          IconButton(
+                                            icon: Icon(
+                                              Icons.delete,
+                                              size: 18,
+                                              color: theme.colorScheme.error,
+                                            ),
+                                            onPressed: () {
+                                              showDialog(
+                                                context: context,
+                                                builder: (_) => DeleteCategoryDialog(
+                                                  categoryName: c.name,
+                                                  onDelete: () => _deleteCategory(c),
+                                                ),
+                                              );
+                                            },
                                           ),
-                                        );
-                                      },
+                                        ],
+                                      ),
                                     ),
-                                  ],
-                                )),
-                              ]);
+                                  ),
+                                ],
+                              );
                             }).toList(),
                           ),
                         ),
