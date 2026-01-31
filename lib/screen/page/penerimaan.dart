@@ -313,6 +313,11 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
                                   onPressed: () => _openDialog(r),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: theme.colorScheme.primary,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    minimumSize: const Size(0, 32),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(18)
+                                      ),
                                   ),
                                   child: Text(
                                     r.status == LoanStatus.menunggu

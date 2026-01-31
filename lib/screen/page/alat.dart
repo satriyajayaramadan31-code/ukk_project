@@ -112,8 +112,11 @@ class _AlatPageState extends State<AlatPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Daftar Alat'),
+      backgroundColor: theme.colorScheme.background,
       drawer: const SideMenu(),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -126,9 +129,9 @@ class _AlatPageState extends State<AlatPage> {
                   searchTerm = value;
                 });
               },
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 hintText: "Cari alat atau kategori...",
-                prefixIcon: const Icon(Icons.search),
+                prefixIcon: Icon(Icons.search),
               ),
             ),
             const SizedBox(height: 16),
@@ -154,23 +157,40 @@ class _AlatPageState extends State<AlatPage> {
                         elevation: 2,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(
+                            color: AppTheme.card,
+                            width: 1.2,
+                          ),
                         ),
+                        clipBehavior: Clip.antiAlias, // biar rounded rapi
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // ====== IMAGE WITH BORDER ======
                             AspectRatio(
                               aspectRatio: 4 / 3,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: AppTheme.card,
-                                  image: DecorationImage(
-                                    image: NetworkImage(item.image),
-                                    fit: BoxFit.cover,
+                              child: Padding(
+                                padding: const EdgeInsets.all(10),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: AppTheme.card,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.network(
+                                      item.image,
+                                      fit: BoxFit.cover,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
+
                             Padding(
                               padding: const EdgeInsets.all(14),
                               child: Column(
@@ -221,8 +241,7 @@ class _AlatPageState extends State<AlatPage> {
                                                   builder: (context) {
                                                     return BorrowRequest(
                                                       equipment: item,
-                                                      onSubmit: () {
-                                                      },
+                                                      onSubmit: () {},
                                                     );
                                                   },
                                                 );

@@ -281,7 +281,13 @@ class _PeminjamanPageState extends State<PeminjamanPage> {
                                   onPressed: () => _openDialog(r),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: theme.colorScheme.primary,
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                    minimumSize: const Size(0, 32),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(18)
+                                      ),
                                   ),
+                                  
                                   child: Text(
                                     r.status == LoanStatus.dipinjam
                                         ? "Kembalikan"
