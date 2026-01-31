@@ -123,7 +123,7 @@ class _KategoriPageState extends State<KategoriPage> {
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Kategori Alat'),
       drawer: const SideMenu(),
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: theme.colorScheme.background,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(

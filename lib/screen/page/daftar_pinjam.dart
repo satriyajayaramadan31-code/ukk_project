@@ -252,7 +252,7 @@ class _DaftarPinjamState extends State<DaftarPinjam> {
 
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Daftar Peminjaman'),
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: theme.colorScheme.background,
       drawer: const SideMenu(),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

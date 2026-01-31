@@ -96,7 +96,7 @@ class _UserPageState extends State<UserPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: theme.colorScheme.background,
       appBar: const AppBarWithMenu(title: 'Manajemen User'),
       drawer: const SideMenu(),
       body: ListView(

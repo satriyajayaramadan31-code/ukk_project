@@ -277,7 +277,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: theme.colorScheme.background,
       appBar: const AppBarWithMenu(title: 'Dashboard'),
       drawer: SideMenu(),
       body: RefreshIndicator(
