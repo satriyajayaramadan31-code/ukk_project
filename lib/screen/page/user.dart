@@ -33,6 +33,12 @@ class _UserPageState extends State<UserPage> {
 
   final TextEditingController _searchController = TextEditingController();
 
+  String _capitalize(String text) {
+    if (text.trim().isEmpty) return text;
+    final t = text.trim();
+    return t[0].toUpperCase() + t.substring(1).toLowerCase();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -59,9 +65,7 @@ class _UserPageState extends State<UserPage> {
     setState(() {
       _filteredUsers = query.isEmpty
           ? _users
-          : _users
-              .where((u) => u.username.toLowerCase().contains(query))
-              .toList();
+          : _users.where((u) => u.username.toLowerCase().contains(query)).toList();
     });
   }
 
@@ -163,6 +167,19 @@ class _UserPageState extends State<UserPage> {
                     child: DataTable(
                       columnSpacing: 32,
                       headingRowColor: WidgetStateProperty.all(theme.scaffoldBackgroundColor),
+                      headingTextStyle: theme.textTheme.bodyMedium,
+                      dataTextStyle: theme.textTheme.bodyMedium,
+                      dividerThickness: 0,
+                      border: const TableBorder(
+                        bottom: BorderSide(
+                          color: Colors.black,
+                          width: 1,
+                        ),
+                        horizontalInside: BorderSide(
+                          color: Colors.black,
+                          width: 1,
+                        ),
+                      ),
                       columns: const [
                         DataColumn(label: Text('Username')),
                         DataColumn(label: Text('Role')),
@@ -173,14 +190,13 @@ class _UserPageState extends State<UserPage> {
                         return DataRow(
                           cells: [
                             DataCell(Text(user.username)),
-                            DataCell(Text(user.role)),
+                            DataCell(Text(_capitalize(user.role))), // ✅ role kapital
                             DataCell(Text(user.password)),
                             DataCell(
                               Center(
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    // Edit
                                     IconButton(
                                       icon: const Icon(Icons.edit, size: 18),
                                       onPressed: () {
@@ -195,7 +211,6 @@ class _UserPageState extends State<UserPage> {
                                       },
                                     ),
                                     const SizedBox(width: 8),
-                                    // Delete
                                     IconButton(
                                       icon: const Icon(Icons.delete, size: 18, color: Colors.red),
                                       onPressed: () {

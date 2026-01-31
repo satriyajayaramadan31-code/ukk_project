@@ -64,13 +64,12 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
     equipmentController.text = (widget.loan['nama_alat'] ?? '').toString();
     borrowController.text = (widget.loan['tanggal_pinjam'] ?? '').toString();
     returnController.text = (widget.loan['tanggal_kembali'] ?? '').toString();
-    dueController.text =
-        (widget.loan['tanggal_pengembalian'] ?? '').toString();
+    dueController.text = (widget.loan['tanggal_pengembalian'] ?? '').toString();
     descriptionController.text = (widget.loan['alasan'] ?? '').toString();
 
     // set initial selected ids if available
-    _selectedUserId = widget.loan['user_id'] as int?;
-    _selectedAlatId = widget.loan['alat_id'] as int?;
+    _selectedUserId = (widget.loan['user_id'] as num?)?.toInt();
+    _selectedAlatId = (widget.loan['alat_id'] as num?)?.toInt();
 
     final rawStatus = (widget.loan['status'] ?? 'menunggu').toString();
     final normalized = rawStatus.toLowerCase().trim();
@@ -81,9 +80,16 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
     try {
       final users = await SupabaseService.getUsers();
       final alat = await SupabaseService.getAlatList();
+
+      // ✅ hanya user role peminjam
+      final peminjamUsers = users.where((u) {
+        final role = (u['role'] ?? '').toString().toLowerCase().trim();
+        return role == 'peminjam';
+      }).toList();
+
       if (!mounted) return;
       setState(() {
-        _users = users;
+        _users = peminjamUsers;
         _alatList = alat;
       });
     } catch (e) {
@@ -174,7 +180,7 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: theme.colorScheme.background,
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: SingleChildScrollView(
@@ -237,7 +243,8 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
                         backgroundColor: theme.colorScheme.primary,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6)),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       child: _loading
@@ -255,9 +262,12 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
                       onPressed: _loading ? null : () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(
-                            color: theme.colorScheme.primary, width: 1.5),
+                          color: theme.colorScheme.primary,
+                          width: 1.5,
+                        ),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6)),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       child: const Text("Batal"),
@@ -272,8 +282,10 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
     );
   }
 
-  Widget _label(String text, ThemeData theme) =>
-      Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(text, style: theme.textTheme.bodyLarge));
+  Widget _label(String text, ThemeData theme) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(text, style: theme.textTheme.bodyLarge),
+      );
 
   Widget _textField(TextEditingController c) => TextField(
         controller: c,
@@ -302,7 +314,11 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
       optionsBuilder: (TextEditingValue value) {
         final query = value.text.toLowerCase().trim();
         if (query.isEmpty) return const Iterable<Map<String, dynamic>>.empty();
-        return _users.where((u) => (u['username'] ?? '').toString().toLowerCase().contains(query));
+
+        return _users.where((u) {
+          final username = (u['username'] ?? '').toString().toLowerCase();
+          return username.contains(query);
+        });
       },
       displayStringForOption: (opt) => opt['username'].toString(),
       onSelected: (opt) {
@@ -313,11 +329,16 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
         userController.text = opt['username'].toString();
       },
       fieldViewBuilder: (context, textController, focusNode, onSubmitted) {
+        // biar default value tetap muncul
+        if (textController.text.isEmpty) {
+          textController.text = userController.text;
+        }
+
         return TextField(
           controller: textController,
           focusNode: focusNode,
           decoration: InputDecoration(
-            hintText: "Ketik nama user...",
+            hintText: "Ketik nama user peminjam...",
             border: _border(context),
             enabledBorder: _border(context),
             focusedBorder: _border(context),
@@ -336,7 +357,11 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
       optionsBuilder: (TextEditingValue value) {
         final query = value.text.toLowerCase().trim();
         if (query.isEmpty) return const Iterable<Map<String, dynamic>>.empty();
-        return _alatList.where((a) => (a['nama_alat'] ?? '').toString().toLowerCase().contains(query));
+
+        return _alatList.where((a) {
+          final nama = (a['nama_alat'] ?? '').toString().toLowerCase();
+          return nama.contains(query);
+        });
       },
       displayStringForOption: (opt) => opt['nama_alat'].toString(),
       onSelected: (opt) {
@@ -347,6 +372,10 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
         equipmentController.text = opt['nama_alat'].toString();
       },
       fieldViewBuilder: (context, textController, focusNode, onSubmitted) {
+        if (textController.text.isEmpty) {
+          textController.text = equipmentController.text;
+        }
+
         return TextField(
           controller: textController,
           focusNode: focusNode,
@@ -388,7 +417,10 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
         padding: const EdgeInsets.only(top: 4),
         child: Text(
           text,
-          style: theme.textTheme.bodySmall!.copyWith(color: Colors.red, fontSize: 11),
+          style: theme.textTheme.bodySmall!.copyWith(
+            color: Colors.red,
+            fontSize: 11,
+          ),
         ),
       );
 }

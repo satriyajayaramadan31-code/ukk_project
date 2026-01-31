@@ -31,8 +31,8 @@ class AppTheme {
       headlineMedium: TextStyle(fontSize: 24 * scale, fontWeight: FontWeight.bold, color: textPrimary),
       headlineSmall: TextStyle(fontSize: 20 * scale, fontWeight: FontWeight.bold, color: textPrimary),
       bodyLarge: TextStyle(fontSize: 18 * scale, color: textPrimary),
-      bodyMedium: TextStyle(fontSize: 16 * scale, color: textSecondary),
-      bodySmall: TextStyle(fontSize: 14 * scale, color: textSecondary),
+      bodyMedium: TextStyle(fontSize: 16 * scale, color: textPrimary),
+      bodySmall: TextStyle(fontSize: 14 * scale, color: textPrimary),
     );
   }
 
@@ -99,11 +99,6 @@ class AppTheme {
         ),
         // Kalau kamu mau error muncul, jangan set height 0
         errorStyle: const TextStyle(fontSize: 12),
-      ),
-
-      dividerTheme: const DividerThemeData(
-        thickness: 1.2,
-        color: Colors.grey,
       ),
 
       iconTheme: IconThemeData(

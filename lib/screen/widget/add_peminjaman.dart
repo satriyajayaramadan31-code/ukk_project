@@ -66,9 +66,15 @@ class _AddPeminjamanDialogState extends State<AddPeminjamanDialog> {
       final users = await SupabaseService.getUsers();
       final alat = await SupabaseService.getAlatList();
 
+      // ✅ filter hanya user role peminjam
+      final peminjamUsers = users.where((u) {
+        final role = (u['role'] ?? '').toString().toLowerCase().trim();
+        return role == 'peminjam';
+      }).toList();
+
       if (!mounted) return;
       setState(() {
-        _users = users;
+        _users = peminjamUsers;
         _alatList = alat;
       });
     } catch (e) {
@@ -77,18 +83,17 @@ class _AddPeminjamanDialogState extends State<AddPeminjamanDialog> {
   }
 
   OutlineInputBorder _border(BuildContext context) => OutlineInputBorder(
-    borderRadius: _radius,
-    borderSide: BorderSide(
-      color: Theme.of(context).colorScheme.primary.withOpacity(0.4),
-      width: 1.5,
-    ),
-  );
+        borderRadius: _radius,
+        borderSide: BorderSide(
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.4),
+          width: 1.5,
+        ),
+      );
 
   Future<void> _pickDate(TextEditingController controller) async {
     final now = DateTime.now();
-    final initial = controller.text.isEmpty
-        ? now
-        : DateTime.tryParse(controller.text) ?? now;
+    final initial =
+        controller.text.isEmpty ? now : DateTime.tryParse(controller.text) ?? now;
 
     final picked = await showDatePicker(
       context: context,
@@ -145,11 +150,7 @@ class _AddPeminjamanDialogState extends State<AddPeminjamanDialog> {
       descriptionError = descriptionController.text.trim().isEmpty;
     });
 
-    if (userError ||
-        equipmentError ||
-        borrowError ||
-        returnError ||
-        descriptionError) {
+    if (userError || equipmentError || borrowError || returnError || descriptionError) {
       return;
     }
 
@@ -157,18 +158,15 @@ class _AddPeminjamanDialogState extends State<AddPeminjamanDialog> {
 
     try {
       final normalizedStatus = status.toLowerCase().trim();
-      final safeStatus = _statuses.contains(normalizedStatus)
-          ? normalizedStatus
-          : 'menunggu';
+      final safeStatus = _statuses.contains(normalizedStatus) ? normalizedStatus : 'menunggu';
 
       final inserted = await SupabaseService.addPeminjaman(
         userId: _selectedUserId!,
         alatId: _selectedAlatId!,
         tanggalPinjam: borrowController.text.trim(),
         tanggalKembali: returnController.text.trim(),
-        tanggalPengembalian: dueController.text.trim().isEmpty
-            ? null
-            : dueController.text.trim(),
+        tanggalPengembalian:
+            dueController.text.trim().isEmpty ? null : dueController.text.trim(),
         alasan: descriptionController.text.trim(),
         status: safeStatus,
       );
@@ -182,9 +180,8 @@ class _AddPeminjamanDialogState extends State<AddPeminjamanDialog> {
     } catch (e) {
       debugPrint('❌ ADD PEMINJAMAN ERROR: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Gagal tambah peminjaman: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Gagal tambah peminjaman: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -209,7 +206,7 @@ class _AddPeminjamanDialogState extends State<AddPeminjamanDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: theme.colorScheme.background,
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: SingleChildScrollView(
@@ -217,10 +214,7 @@ class _AddPeminjamanDialogState extends State<AddPeminjamanDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Center(
-                child: Text(
-                  "Tambah Peminjaman",
-                  style: theme.textTheme.headlineSmall,
-                ),
+                child: Text("Tambah Peminjaman", style: theme.textTheme.headlineSmall),
               ),
               const SizedBox(height: 16),
 
@@ -291,10 +285,7 @@ class _AddPeminjamanDialogState extends State<AddPeminjamanDialog> {
                     child: OutlinedButton(
                       onPressed: _loading ? null : () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(
-                          color: theme.colorScheme.primary,
-                          width: 1.5,
-                        ),
+                        side: BorderSide(color: theme.colorScheme.primary, width: 1.5),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(6),
                         ),
@@ -313,31 +304,31 @@ class _AddPeminjamanDialogState extends State<AddPeminjamanDialog> {
   }
 
   Widget _label(String text, ThemeData theme) => Padding(
-    padding: const EdgeInsets.only(bottom: 6),
-    child: Text(text, style: theme.textTheme.bodyLarge),
-  );
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(text, style: theme.textTheme.bodyLarge),
+      );
 
   Widget _textField(TextEditingController c) => TextField(
-    controller: c,
-    decoration: InputDecoration(
-      border: _border(context),
-      enabledBorder: _border(context),
-      focusedBorder: _border(context),
-    ),
-  );
+        controller: c,
+        decoration: InputDecoration(
+          border: _border(context),
+          enabledBorder: _border(context),
+          focusedBorder: _border(context),
+        ),
+      );
 
   Widget _dateField(TextEditingController c, String hint) => TextField(
-    controller: c,
-    readOnly: true,
-    onTap: () => _pickDate(c),
-    decoration: InputDecoration(
-      hintText: hint,
-      suffixIcon: const Icon(Icons.calendar_month),
-      border: _border(context),
-      enabledBorder: _border(context),
-      focusedBorder: _border(context),
-    ),
-  );
+        controller: c,
+        readOnly: true,
+        onTap: () => _pickDate(c),
+        decoration: InputDecoration(
+          hintText: hint,
+          suffixIcon: const Icon(Icons.calendar_month),
+          border: _border(context),
+          enabledBorder: _border(context),
+          focusedBorder: _border(context),
+        ),
+      );
 
   // ================= FIXED AUTOCOMPLETE =================
 
@@ -362,16 +353,16 @@ class _AddPeminjamanDialogState extends State<AddPeminjamanDialog> {
       },
       fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
         return TextField(
-          controller: textController, // WAJIB pakai ini
+          controller: textController,
           focusNode: focusNode,
           decoration: InputDecoration(
-            hintText: "Ketik nama user...",
+            hintText: "Ketik nama user peminjam...",
             border: _border(context),
             enabledBorder: _border(context),
             focusedBorder: _border(context),
           ),
           onChanged: (v) {
-            userController.text = v; // sync ke controller utama
+            userController.text = v;
             setState(() => _selectedUserId = null);
           },
         );
@@ -400,7 +391,7 @@ class _AddPeminjamanDialogState extends State<AddPeminjamanDialog> {
       },
       fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
         return TextField(
-          controller: textController, // WAJIB pakai ini
+          controller: textController,
           focusNode: focusNode,
           decoration: InputDecoration(
             hintText: "Ketik nama alat...",
@@ -409,7 +400,7 @@ class _AddPeminjamanDialogState extends State<AddPeminjamanDialog> {
             focusedBorder: _border(context),
           ),
           onChanged: (v) {
-            equipmentController.text = v; // sync ke controller utama
+            equipmentController.text = v;
             setState(() => _selectedAlatId = null);
           },
         );
@@ -437,13 +428,13 @@ class _AddPeminjamanDialogState extends State<AddPeminjamanDialog> {
   }
 
   Widget _error(String text, ThemeData theme) => Padding(
-    padding: const EdgeInsets.only(top: 4),
-    child: Text(
-      text,
-      style: theme.textTheme.bodySmall!.copyWith(
-        color: Colors.red,
-        fontSize: 15,
-      ),
-    ),
-  );
+        padding: const EdgeInsets.only(top: 4),
+        child: Text(
+          text,
+          style: theme.textTheme.bodySmall!.copyWith(
+            color: Colors.red,
+            fontSize: 15,
+          ),
+        ),
+      );
 }

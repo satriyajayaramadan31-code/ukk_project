@@ -196,6 +196,19 @@ class _KategoriPageState extends State<KategoriPage> {
                             headingRowColor: WidgetStateProperty.all(
                               theme.scaffoldBackgroundColor,
                             ),
+                            headingTextStyle: theme.textTheme.bodyMedium,
+                            dataTextStyle: theme.textTheme.bodyMedium,
+                            dividerThickness: 0,
+                            border: const TableBorder(
+                              bottom: BorderSide(
+                                color: Colors.black,
+                                width: 1,
+                              ),
+                              horizontalInside: BorderSide(
+                                color: Colors.black,
+                                width: 1,
+                              ),
+                            ),
                             columns: const [
                               DataColumn(label: Text('Nama')),
                               DataColumn(label: Text('Jumlah Alat')),

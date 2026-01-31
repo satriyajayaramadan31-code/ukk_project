@@ -84,43 +84,60 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
     final theme = Theme.of(context);
 
     return AlertDialog(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: theme.colorScheme.background,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(6),
       ),
       title: Text(
         'Tambah Kategori',
-        style: theme.textTheme.headlineSmall,
+        style: 
+          theme.textTheme.headlineSmall,
+          textAlign: TextAlign.center,
       ),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        decoration: InputDecoration(
-          labelText: 'Nama Kategori',
-          labelStyle: theme.textTheme.bodyMedium,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(
-              color: theme.colorScheme.primary.withOpacity(0.5),
-              width: 1.5,
+
+      // ✅ Tambahkan tulisan "Kategori" di atas input
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 16),
+          Text(
+            'Kategori',
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Masukkan nama kategori',
+              hintStyle: theme.textTheme.bodyMedium,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.primary.withOpacity(0.5),
+                  width: 1.5,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.primary.withOpacity(0.5),
+                  width: 1.5,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.primary,
+                  width: 1.8,
+                ),
+              ),
             ),
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(
-              color: theme.colorScheme.primary.withOpacity(0.5),
-              width: 1.5,
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(
-              color: theme.colorScheme.primary,
-              width: 1.8,
-            ),
-          ),
-        ),
+        ],
       ),
+
       actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       actions: [
         Row(
@@ -156,9 +173,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
                 ),
               ),
             ),
-
             const SizedBox(width: 12),
-
             Expanded(
               child: OutlinedButton(
                 style: OutlinedButton.styleFrom(

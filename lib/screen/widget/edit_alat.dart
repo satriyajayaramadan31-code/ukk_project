@@ -79,6 +79,7 @@ class _EditAlatDialogState extends State<EditAlatDialog> {
       useRootNavigator: true,
       builder: (context) {
         return Dialog(
+          backgroundColor: AppTheme.background,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
           child: Padding(
             padding: const EdgeInsets.all(20),

@@ -378,6 +378,19 @@ class _DaftarPinjamState extends State<DaftarPinjam> {
                             headingRowColor: WidgetStatePropertyAll(
                               theme.scaffoldBackgroundColor,
                             ),
+                            headingTextStyle: theme.textTheme.bodyMedium,
+                            dataTextStyle: theme.textTheme.bodyMedium,
+                            dividerThickness: 0,
+                            border: const TableBorder(
+                              bottom: BorderSide(
+                                color: Colors.black,
+                                width: 1,
+                              ),
+                              horizontalInside: BorderSide(
+                                color: Colors.black,
+                                width: 1,
+                              ),
+                            ),
                             columns: const [
                               DataColumn(label: Text('Peminjam')),
                               DataColumn(label: Text('Nama Alat')),
@@ -386,7 +399,7 @@ class _DaftarPinjamState extends State<DaftarPinjam> {
                               DataColumn(label: Text('Tgl Kembali')),
                               DataColumn(label: Text('Pengembalian')),
                               DataColumn(label: Text('Terlambat')),
-                              DataColumn(label: Text('Rusak')),
+                              DataColumn(label: Text('Kondisi')),
                               DataColumn(label: Text('Status')),
                               DataColumn(label: Center(child: Text('Aksi'))),
                             ],

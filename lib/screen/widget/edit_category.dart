@@ -61,10 +61,10 @@ class _EditCategoryDialogState extends State<EditCategoryDialog> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Icon(
-                    Icons.check_circle,
+                  Icon(
+                    icon,
                     size: 72,
-                    color: Colors.green, // tetap hijau
+                    color: Colors.green,
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -92,42 +92,55 @@ class _EditCategoryDialogState extends State<EditCategoryDialog> {
     final theme = Theme.of(context);
 
     return AlertDialog(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: theme.colorScheme.background,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(6),
       ),
       title: Text(
         'Edit Kategori',
         style: theme.textTheme.headlineSmall,
+        textAlign: TextAlign.center,
       ),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        decoration: InputDecoration(
-          labelText: 'Nama Kategori',
-          labelStyle: theme.textTheme.bodyMedium,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(
-              color: theme.colorScheme.primary.withOpacity(0.5),
-              width: 1.5,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 8),
+          Text(
+            'Kategori',
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Nama Kategori',
+              hintStyle: theme.textTheme.bodyMedium,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.primary.withOpacity(0.5),
+                  width: 1.5,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.primary.withOpacity(0.5),
+                  width: 1.5,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.primary,
+                  width: 1.8,
+                ),
+              ),
             ),
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(
-              color: theme.colorScheme.primary.withOpacity(0.5),
-              width: 1.5,
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(6),
-            borderSide: BorderSide(
-              color: theme.colorScheme.primary,
-              width: 1.8,
-            ),
-          ),
-        ),
+        ],
       ),
       actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       actions: [

@@ -117,15 +117,15 @@ class _LogsPageState extends State<LogsPage> {
                   Row(
                     children: [
                       Text(
-                        'History',
+                        'Riwayat',
                         style: theme.textTheme.headlineSmall,
                       ),
                       const Spacer(),
 
                       Tooltip(
                         message: _ascending
-                            ? 'Urut: Tertua → Terbaru'
-                            : 'Urut: Terbaru → Tertua',
+                            ? 'Urut: Telama → Terbaru'
+                            : 'Urut: Terbaru → Terlama',
                         child: Material(
                           color: theme.colorScheme.surface,
                           borderRadius: BorderRadius.circular(10),
@@ -147,7 +147,7 @@ class _LogsPageState extends State<LogsPage> {
                                   const Icon(Icons.sort, size: 18),
                                   const SizedBox(width: 6),
                                   Text(
-                                    _ascending ? "Tertua" : "Terbaru",
+                                    _ascending ? "Terlama" : "Terbaru",
                                     style: theme.textTheme.bodyLarge,
                                   ),
                                 ],
@@ -160,7 +160,6 @@ class _LogsPageState extends State<LogsPage> {
                   ),
 
                   const SizedBox(height: 10),
-                  const SizedBox(height: 10),
 
                   // TABLE
                   SingleChildScrollView(
@@ -168,6 +167,19 @@ class _LogsPageState extends State<LogsPage> {
                     child: DataTable(
                       headingRowColor: WidgetStateProperty.all(
                         theme.scaffoldBackgroundColor,
+                      ),
+                      headingTextStyle: theme.textTheme.bodyMedium,
+                      dataTextStyle: theme.textTheme.bodyMedium,
+                      dividerThickness: 0,
+                      border: const TableBorder(
+                        bottom: BorderSide(
+                          color: Colors.black,
+                          width: 1,
+                        ),
+                        horizontalInside: BorderSide(
+                          color: Colors.black,
+                          width: 1,
+                        ),
                       ),
                       columns: const [
                         DataColumn(label: Text('Username')),

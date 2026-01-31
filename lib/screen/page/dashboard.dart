@@ -235,6 +235,7 @@ class _DashboardPageState extends State<DashboardPage> {
         title: 'Alat',
         value: (_stats['totalEquipment'] ?? 0).toString(),
         icon: Icons.inventory_2,
+        iconColor: AppTheme.statusReturned,
       ),
       StatCard(
         title: 'Dipinjam',
