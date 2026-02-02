@@ -194,7 +194,7 @@ class _KategoriPageState extends State<KategoriPage> {
                           child: DataTable(
                             columnSpacing: 32,
                             headingRowColor: WidgetStateProperty.all(
-                              theme.scaffoldBackgroundColor,
+                              theme.colorScheme.surface,
                             ),
                             headingTextStyle: theme.textTheme.bodyMedium,
                             dataTextStyle: theme.textTheme.bodyMedium,

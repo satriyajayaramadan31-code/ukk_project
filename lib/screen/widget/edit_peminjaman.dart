@@ -5,11 +5,13 @@ import 'package:engine_rent_app/service/supabase_service.dart';
 class EditPeminjamanDialog extends StatefulWidget {
   final Map<String, dynamic> loan;
   final Function(Map<String, dynamic>) onEdit;
+  final BuildContext parentContext;
 
   const EditPeminjamanDialog({
     super.key,
     required this.loan,
     required this.onEdit,
+    required this.parentContext,
   });
 
   @override
@@ -17,7 +19,6 @@ class EditPeminjamanDialog extends StatefulWidget {
 }
 
 class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
-  // controllers
   final userController = TextEditingController();
   final equipmentController = TextEditingController();
   final borrowController = TextEditingController();
@@ -25,7 +26,6 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
   final dueController = TextEditingController();
   final descriptionController = TextEditingController();
 
-  // selected ids
   int? _selectedUserId;
   int? _selectedAlatId;
 
@@ -38,7 +38,6 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
 
   final _radius = BorderRadius.circular(8);
 
-  // status valid
   final List<String> _statuses = const [
     'menunggu',
     'diproses',
@@ -50,7 +49,6 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
 
   String status = 'menunggu';
 
-  // data autocomplete
   List<Map<String, dynamic>> _users = [];
   List<Map<String, dynamic>> _alatList = [];
 
@@ -59,7 +57,6 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
     super.initState();
     _loadAutocompleteData();
 
-    // populate controllers from loan
     userController.text = (widget.loan['username'] ?? '').toString();
     equipmentController.text = (widget.loan['nama_alat'] ?? '').toString();
     borrowController.text = (widget.loan['tanggal_pinjam'] ?? '').toString();
@@ -67,7 +64,6 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
     dueController.text = (widget.loan['tanggal_pengembalian'] ?? '').toString();
     descriptionController.text = (widget.loan['alasan'] ?? '').toString();
 
-    // set initial selected ids if available
     _selectedUserId = (widget.loan['user_id'] as num?)?.toInt();
     _selectedAlatId = (widget.loan['alat_id'] as num?)?.toInt();
 
@@ -81,7 +77,6 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
       final users = await SupabaseService.getUsers();
       final alat = await SupabaseService.getAlatList();
 
-      // ✅ hanya user role peminjam
       final peminjamUsers = users.where((u) {
         final role = (u['role'] ?? '').toString().toLowerCase().trim();
         return role == 'peminjam';
@@ -95,17 +90,6 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
     } catch (e) {
       debugPrint("❌ LOAD AUTOCOMPLETE ERROR: $e");
     }
-  }
-
-  @override
-  void dispose() {
-    userController.dispose();
-    equipmentController.dispose();
-    borrowController.dispose();
-    returnController.dispose();
-    dueController.dispose();
-    descriptionController.dispose();
-    super.dispose();
   }
 
   OutlineInputBorder _border(BuildContext context) => OutlineInputBorder(
@@ -124,13 +108,47 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
     final picked = await showDatePicker(
       context: context,
       initialDate: initial,
-      firstDate: DateTime(now.year - 5),
-      lastDate: DateTime(now.year + 5),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
     );
 
     if (picked != null) {
       controller.text = DateFormat('yyyy-MM-dd').format(picked);
     }
+  }
+
+  void _showSuccessPopup() {
+    showDialog(
+      context: widget.parentContext,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(widget.parentContext).pop(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Icon(Icons.check_circle, size: 72, color: Colors.green),
+              const SizedBox(height: 16),
+              const Text(
+                "Peminjaman Berhasil Diedit",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _submit() async {
@@ -146,6 +164,9 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
     setState(() => _loading = true);
 
     try {
+      final normalizedStatus = status.toLowerCase().trim();
+      final safeStatus = _statuses.contains(normalizedStatus) ? normalizedStatus : 'menunggu';
+
       final updated = await SupabaseService.editPeminjaman(
         id: widget.loan['id'],
         userId: _selectedUserId!,
@@ -155,27 +176,39 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
         tanggalPengembalian:
             dueController.text.trim().isEmpty ? null : dueController.text.trim(),
         alasan: descriptionController.text.trim(),
-        status: status,
+        status: safeStatus,
       );
 
       widget.onEdit(updated);
 
       if (!mounted) return;
-      Navigator.pop(context);
+      Navigator.of(context).pop();
+      Future.microtask(_showSuccessPopup);
     } catch (e) {
       debugPrint('❌ EDIT PEMINJAMAN ERROR: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal edit peminjaman: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Gagal edit peminjaman: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
+  void dispose() {
+    userController.dispose();
+    equipmentController.dispose();
+    borrowController.dispose();
+    returnController.dispose();
+    dueController.dispose();
+    descriptionController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final currentStatus = _statuses.contains(status) ? status : 'menunggu';
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -188,10 +221,7 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Center(
-                child: Text(
-                  "Edit Peminjaman",
-                  style: theme.textTheme.headlineSmall,
-                ),
+                child: Text("Edit Peminjaman", style: theme.textTheme.headlineSmall),
               ),
               const SizedBox(height: 16),
 
@@ -208,13 +238,13 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
               const SizedBox(height: 12),
 
               _label("Tanggal Pinjam", theme),
-              _dateField(borrowController, "Pilih Tanggal Pinjam"),
+              _dateField(borrowController, "Pilih tanggal pinjam"),
               if (borrowError) _error("Tanggal pinjam wajib diisi", theme),
 
               const SizedBox(height: 12),
 
               _label("Tanggal Kembali", theme),
-              _dateField(returnController, "Pilih Tanggal Kembali"),
+              _dateField(returnController, "Pilih tanggal kembali"),
 
               const SizedBox(height: 12),
 
@@ -230,7 +260,7 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
               const SizedBox(height: 12),
 
               _label("Status", theme),
-              _statusDropdown(),
+              _statusDropdown(value: currentStatus),
 
               const SizedBox(height: 20),
 
@@ -261,10 +291,7 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
                     child: OutlinedButton(
                       onPressed: _loading ? null : () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(
-                          color: theme.colorScheme.primary,
-                          width: 1.5,
-                        ),
+                        side: BorderSide(color: theme.colorScheme.primary, width: 1.5),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(6),
                         ),
@@ -314,7 +341,6 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
       optionsBuilder: (TextEditingValue value) {
         final query = value.text.toLowerCase().trim();
         if (query.isEmpty) return const Iterable<Map<String, dynamic>>.empty();
-
         return _users.where((u) {
           final username = (u['username'] ?? '').toString().toLowerCase();
           return username.contains(query);
@@ -328,12 +354,8 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
         });
         userController.text = opt['username'].toString();
       },
-      fieldViewBuilder: (context, textController, focusNode, onSubmitted) {
-        // biar default value tetap muncul
-        if (textController.text.isEmpty) {
-          textController.text = userController.text;
-        }
-
+      fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
+        if (textController.text.isEmpty) textController.text = userController.text;
         return TextField(
           controller: textController,
           focusNode: focusNode,
@@ -357,7 +379,6 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
       optionsBuilder: (TextEditingValue value) {
         final query = value.text.toLowerCase().trim();
         if (query.isEmpty) return const Iterable<Map<String, dynamic>>.empty();
-
         return _alatList.where((a) {
           final nama = (a['nama_alat'] ?? '').toString().toLowerCase();
           return nama.contains(query);
@@ -371,11 +392,8 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
         });
         equipmentController.text = opt['nama_alat'].toString();
       },
-      fieldViewBuilder: (context, textController, focusNode, onSubmitted) {
-        if (textController.text.isEmpty) {
-          textController.text = equipmentController.text;
-        }
-
+      fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
+        if (textController.text.isEmpty) textController.text = equipmentController.text;
         return TextField(
           controller: textController,
           focusNode: focusNode,
@@ -394,9 +412,9 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
     );
   }
 
-  Widget _statusDropdown() {
+  Widget _statusDropdown({required String value}) {
     return DropdownButtonFormField<String>(
-      initialValue: _statuses.contains(status) ? status : 'menunggu',
+      initialValue: value,
       decoration: InputDecoration(
         border: _border(context),
         enabledBorder: _border(context),
@@ -419,7 +437,7 @@ class _EditPeminjamanDialogState extends State<EditPeminjamanDialog> {
           text,
           style: theme.textTheme.bodySmall!.copyWith(
             color: Colors.red,
-            fontSize: 11,
+            fontSize: 15,
           ),
         ),
       );

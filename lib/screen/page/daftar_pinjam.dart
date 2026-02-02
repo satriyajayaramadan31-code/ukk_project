@@ -375,9 +375,6 @@ class _DaftarPinjamState extends State<DaftarPinjam> {
                           scrollDirection: Axis.horizontal,
                           child: DataTable(
                             columnSpacing: 28,
-                            headingRowColor: WidgetStatePropertyAll(
-                              theme.scaffoldBackgroundColor,
-                            ),
                             headingTextStyle: theme.textTheme.bodyMedium,
                             dataTextStyle: theme.textTheme.bodyMedium,
                             dividerThickness: 0,
@@ -466,7 +463,10 @@ class _DaftarPinjamState extends State<DaftarPinjam> {
                                                 context: context,
                                                 builder: (_) => EditPeminjamanDialog(
                                                   loan: loan,
-                                                  onEdit: (_) async {},
+                                                  onEdit: (updated) {
+                                                    // update data list atau refresh UI
+                                                  },
+                                                  parentContext: context, // ✅ tambahkan ini
                                                 ),
                                               );
                                             },

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../models/loan_request.dart';
+import 'package:intl/intl.dart';
 
 class TerimaPinjamDialog extends StatelessWidget {
-  final LoanRequest request;
+  final Map<String, dynamic> request;
   final VoidCallback onApprove;
   final VoidCallback onReject;
 
@@ -13,40 +13,52 @@ class TerimaPinjamDialog extends StatelessWidget {
     required this.onReject,
   });
 
-  Color _statusColor(LoanStatus status) {
-    switch (status) {
-      case LoanStatus.menunggu:
+  // ===== STATUS UI (samakan dengan yang lama) =====
+  Color _statusColor(String status) {
+    final s = status.toLowerCase();
+    switch (s) {
+      case 'menunggu':
         return Colors.amber;
-      case LoanStatus.diproses:
+      case 'diproses':
         return Colors.blue;
-      case LoanStatus.dipinjam:
+      case 'dipinjam':
         return Colors.green;
-      case LoanStatus.dikembalikan:
+      case 'dikembalikan':
         return Colors.teal;
-      case LoanStatus.ditolak:
+      case 'ditolak':
         return Colors.red;
+      default:
+        return Colors.grey;
     }
   }
 
-  String _statusText(LoanStatus status) {
-    switch (status) {
-      case LoanStatus.menunggu:
+  String _statusText(String status) {
+    if (status.isEmpty) return "-";
+    final s = status.toLowerCase();
+    switch (s) {
+      case 'menunggu':
         return "Menunggu";
-      case LoanStatus.diproses:
+      case 'diproses':
         return "Diproses";
-      case LoanStatus.dipinjam:
+      case 'dipinjam':
         return "Dipinjam";
-      case LoanStatus.dikembalikan:
+      case 'dikembalikan':
         return "Dikembalikan";
-      case LoanStatus.ditolak:
+      case 'ditolak':
         return "Ditolak";
+      default:
+        // fallback: kapital huruf pertama
+        return s[0].toUpperCase() + s.substring(1);
     }
   }
 
-  String _formatDate(String dateString) {
-    final date = DateTime.tryParse(dateString);
-    if (date == null) return "-";
-    return "${date.day}-${date.month}-${date.year}";
+  String _formatDate(dynamic value) {
+    if (value == null) return "-";
+    final s = value.toString();
+    if (s.isEmpty) return "-";
+    final dt = DateTime.tryParse(s);
+    if (dt == null) return "-";
+    return DateFormat.yMMMMd('id').format(dt);
   }
 
   @override
@@ -54,155 +66,163 @@ class TerimaPinjamDialog extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       backgroundColor: theme.scaffoldBackgroundColor,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Proses Pengajuan",
-                  style: theme.textTheme.headlineSmall,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Peminjam
-            Text("Peminjam", style: theme.textTheme.bodySmall),
-            const SizedBox(height: 4),
-            Text(request.userName, style: theme.textTheme.bodyMedium),
-
-            const SizedBox(height: 10),
-
-            // Status
-            Text("Status", style: theme.textTheme.bodySmall),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: _statusColor(request.status),
-                borderRadius: BorderRadius.circular(12),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("Proses Pengajuan", style: theme.textTheme.headlineSmall),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
               ),
-              child: Text(
-                _statusText(request.status),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
+              const SizedBox(height: 12),
+
+              // Peminjam
+              Text("Peminjam", style: theme.textTheme.bodySmall),
+              const SizedBox(height: 4),
+              Text(
+                (request['username'] ?? '-').toString(),
+                style: theme.textTheme.bodyMedium,
               ),
-            ),
 
-            const SizedBox(height: 10),
+              const SizedBox(height: 10),
 
-            // Nama Alat
-            Text("Nama Alat", style: theme.textTheme.bodySmall),
-            const SizedBox(height: 4),
-            Text(request.equipmentName, style: theme.textTheme.bodyMedium),
-
-            const SizedBox(height: 10),
-
-            // Tanggal
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Tanggal Pinjam",
-                          style: theme.textTheme.bodySmall),
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatDate(request.borrowDate),
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ],
+              // Status (INI yang tadi hilang)
+              Text("Status", style: theme.textTheme.bodySmall),
+              const SizedBox(height: 4),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _statusColor((request['status'] ?? '').toString()),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _statusText((request['status'] ?? '').toString()),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Jatuh Tempo",
-                          style: theme.textTheme.bodySmall),
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatDate(request.dueDate),
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 10),
-
-            // Tujuan
-            Text("Tujuan Peminjaman", style: theme.textTheme.bodySmall),
-            const SizedBox(height: 4),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(request.purpose),
-            ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 10),
 
-            // Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: onApprove,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
-                      ),
+              // Nama Alat
+              Text("Nama Alat", style: theme.textTheme.bodySmall),
+              const SizedBox(height: 4),
+              Text(
+                (request['nama_alat'] ?? '-').toString(),
+                style: theme.textTheme.bodyMedium,
+              ),
+
+              const SizedBox(height: 10),
+
+              // Tanggal
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Tanggal Pinjam",
+                            style: theme.textTheme.bodySmall),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatDate(request['tanggal_pinjam']),
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ],
                     ),
-                    child: const Text("Setujui"),
                   ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Jatuh Tempo", style: theme.textTheme.bodySmall),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatDate(request['tanggal_kembali']),
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+
+              // Tujuan
+              Text("Tujuan Peminjaman", style: theme.textTheme.bodySmall),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: onReject,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      foregroundColor: theme.colorScheme.primary,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        side: BorderSide(
-                          color: theme.colorScheme.primary,
+                child: Text(
+                  (request['alasan'] ?? '-').toString(),
+                  style: theme.textTheme.bodyMedium,
+                  softWrap: true,
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Buttons (samakan seperti lama -> ElevatedButton)
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: onApprove,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
                         ),
                       ),
+                      child: const Text("Setujui"),
                     ),
-                    child: const Text("Tolak"),
                   ),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: onReject,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: theme.colorScheme.primary,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          side: BorderSide(color: theme.colorScheme.primary),
+                        ),
+                      ),
+                      child: const Text("Tolak"),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

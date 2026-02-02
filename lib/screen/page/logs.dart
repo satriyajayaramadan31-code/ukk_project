@@ -165,9 +165,6 @@ class _LogsPageState extends State<LogsPage> {
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: DataTable(
-                      headingRowColor: WidgetStateProperty.all(
-                        theme.scaffoldBackgroundColor,
-                      ),
                       headingTextStyle: theme.textTheme.bodyMedium,
                       dataTextStyle: theme.textTheme.bodyMedium,
                       dividerThickness: 0,

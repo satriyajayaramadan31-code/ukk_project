@@ -213,7 +213,7 @@ class _DaftarAlatPageState extends State<DaftarAlatPage> {
 
                 // TABLE CARD
                 Card(
-                  color: theme.scaffoldBackgroundColor,
+                  color: theme.colorScheme.surface,
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Column(
@@ -230,9 +230,6 @@ class _DaftarAlatPageState extends State<DaftarAlatPage> {
                           scrollDirection: Axis.horizontal,
                           child: DataTable(
                             columnSpacing: 20,
-                            headingRowColor: WidgetStateProperty.all(
-                              theme.scaffoldBackgroundColor,
-                            ),
                             headingTextStyle: theme.textTheme.bodyMedium,
                             dataTextStyle: theme.textTheme.bodyMedium,
                             dividerThickness: 0,

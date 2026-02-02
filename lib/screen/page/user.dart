@@ -151,7 +151,7 @@ class _UserPageState extends State<UserPage> {
 
           // Users Table
           Card(
-            color: theme.scaffoldBackgroundColor,
+            color: theme.colorScheme.surface,
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
@@ -166,7 +166,6 @@ class _UserPageState extends State<UserPage> {
                     scrollDirection: Axis.horizontal,
                     child: DataTable(
                       columnSpacing: 32,
-                      headingRowColor: WidgetStateProperty.all(theme.scaffoldBackgroundColor),
                       headingTextStyle: theme.textTheme.bodyMedium,
                       dataTextStyle: theme.textTheme.bodyMedium,
                       dividerThickness: 0,

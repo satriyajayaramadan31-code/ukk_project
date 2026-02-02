@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
 import '../widget/app_bar.dart';
 import '../widget/side_menu.dart';
 import '../models/loan_request.dart';
 import '../widget/detail_pinjam.dart';
 import '../widget/pinjam_card.dart';
-import '../widget/kembalikan.dart'; // <- popup kembalikan
+import '../widget/kembalikan.dart';
 import '../utils/theme.dart';
-import 'package:intl/intl.dart';
 
 class PeminjamanPage extends StatefulWidget {
   const PeminjamanPage({super.key});
@@ -65,14 +66,35 @@ class _PeminjamanPageState extends State<PeminjamanPage> {
   @override
   void initState() {
     super.initState();
-    _filteredRequests = _requests;
+    _filteredRequests = List.from(_requests);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // ========= ADAPTER: LoanRequest -> Map<String, dynamic> =========
+  Map<String, dynamic> _toMap(LoanRequest r) {
+    return {
+      'id': r.id,
+      'username': r.userName,
+      'nama_alat': r.equipmentName,
+      'tanggal_pinjam': r.borrowDate,
+      'tanggal_kembali': r.dueDate,
+      'tanggal_pengembalian': r.returnDate,
+      'alasan': r.purpose,
+      'status': _statusText(r.status),
+    };
   }
 
   void _filterRequests() {
-    final query = _searchController.text.toLowerCase();
+    final query = _searchController.text.toLowerCase().trim();
+
     setState(() {
       _filteredRequests = query.isEmpty
-          ? _requests
+          ? List.from(_requests)
           : _requests.where((r) {
               return r.userName.toLowerCase().contains(query) ||
                   r.equipmentName.toLowerCase().contains(query) ||
@@ -97,7 +119,7 @@ class _PeminjamanPageState extends State<PeminjamanPage> {
   }
 
   String _statusText(LoanStatus status) {
-    return status.toString().split('.').last;
+    return status.toString().split('.').last; // menunggu/dipinjam/dll
   }
 
   String _formatDate(String dateString) {
@@ -122,10 +144,13 @@ class _PeminjamanPageState extends State<PeminjamanPage> {
         ),
       );
     } else {
+      // ✅ FIX: kirim Map<String, dynamic> bukan LoanRequest
+      final map = _toMap(request);
+
       showDialog(
         context: context,
         builder: (_) => DetailPinjamDialog(
-          request: request,
+          request: map,
           statusText: _statusText(request.status),
           statusColor: _statusColor(request.status),
         ),
@@ -243,7 +268,8 @@ class _PeminjamanPageState extends State<PeminjamanPage> {
                     child: DataTable(
                       columnSpacing: 28,
                       headingRowColor: WidgetStatePropertyAll(
-                          theme.scaffoldBackgroundColor),
+                        theme.scaffoldBackgroundColor,
+                      ),
                       columns: const [
                         DataColumn(label: Text('Nama Alat')),
                         DataColumn(label: Text('Tgl Pinjam')),
@@ -262,7 +288,9 @@ class _PeminjamanPageState extends State<PeminjamanPage> {
                             DataCell(
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 6),
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
                                 decoration: BoxDecoration(
                                   color: _statusColor(r.status),
                                   borderRadius: BorderRadius.circular(20),
@@ -281,13 +309,15 @@ class _PeminjamanPageState extends State<PeminjamanPage> {
                                   onPressed: () => _openDialog(r),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: theme.colorScheme.primary,
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 4,
+                                    ),
                                     minimumSize: const Size(0, 32),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(18)
-                                      ),
+                                      borderRadius: BorderRadius.circular(18),
+                                    ),
                                   ),
-                                  
                                   child: Text(
                                     r.status == LoanStatus.dipinjam
                                         ? "Kembalikan"

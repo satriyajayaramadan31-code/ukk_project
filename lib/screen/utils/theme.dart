@@ -49,7 +49,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: scheme.surface,
+      scaffoldBackgroundColor: scheme.background,
 
       appBarTheme: AppBarTheme(
         backgroundColor: scheme.primary,

@@ -22,6 +22,7 @@ class Alat {
   final String kategoriNama;
   final int denda;
   final int perbaikan;
+  final bool? rusak; // lebih bagus final kalau tidak mau diubah manual
 
   final Uint8List? bytes;
 
@@ -34,8 +35,19 @@ class Alat {
     required this.kategoriNama,
     required this.denda,
     required this.perbaikan,
+    this.rusak,
     this.bytes,
   });
+
+  static bool? _parseBool(dynamic v) {
+    if (v == null) return null;
+    if (v is bool) return v;
+    if (v is int) return v == 1;
+    final s = v.toString().trim().toLowerCase();
+    if (s == 'true' || s == '1' || s == 'ya' || s == 'yes') return true;
+    if (s == 'false' || s == '0' || s == 'tidak' || s == 'no') return false;
+    return null;
+  }
 
   factory Alat.fromMap(Map<String, dynamic> json) {
     return Alat(
@@ -49,6 +61,7 @@ class Alat {
           : '',
       denda: json['denda'] ?? 0,
       perbaikan: json['perbaikan'] ?? 0,
+      rusak: _parseBool(json['rusak']) ?? false, // ✅ ini yang kurang
     );
   }
 }
@@ -110,8 +123,11 @@ class SupabaseService {
       final token = await _readToken();
       if (token == null) return null;
 
-      final user =
-          await _client.from('user').select('id').eq('token', token).maybeSingle();
+      final user = await _client
+          .from('user')
+          .select('id')
+          .eq('token', token)
+          .maybeSingle();
 
       final id = user?['id'];
       if (id == null) return null;
@@ -128,8 +144,11 @@ class SupabaseService {
       final token = await _readToken();
       if (token == null) return null;
 
-      final user =
-          await _client.from('user').select('role').eq('token', token).maybeSingle();
+      final user = await _client
+          .from('user')
+          .select('role')
+          .eq('token', token)
+          .maybeSingle();
 
       return user?['role'];
     } catch (e) {
@@ -221,7 +240,9 @@ class SupabaseService {
       await _writeToken((user['token'] ?? '').toString());
 
       // ✅ log login
-      final uid = (user['id'] is int) ? user['id'] : int.tryParse(user['id'].toString());
+      final uid = (user['id'] is int)
+          ? user['id']
+          : int.tryParse(user['id'].toString());
       if (uid != null) {
         await insertLog(description: 'Login', userId: uid);
       }
@@ -253,8 +274,11 @@ class SupabaseService {
       final token = await _readToken();
       if (token == null) return false;
 
-      final user =
-          await _client.from('user').select('id').eq('token', token).maybeSingle();
+      final user = await _client
+          .from('user')
+          .select('id')
+          .eq('token', token)
+          .maybeSingle();
 
       debugPrint('🔍 AUTH CHECK: $user');
       return user != null;
@@ -271,8 +295,10 @@ class SupabaseService {
     required int? userId,
   }) async {
     try {
-      PostgrestFilterBuilder q =
-          _client.from('peminjaman').select('id').eq('status', status);
+      PostgrestFilterBuilder q = _client
+          .from('peminjaman')
+          .select('id')
+          .eq('status', status);
 
       if (role == 'Peminjam' && userId != null) q = q.eq('user', userId);
 
@@ -289,8 +315,10 @@ class SupabaseService {
     required int? userId,
   }) async {
     try {
-      PostgrestFilterBuilder q =
-          _client.from('peminjaman').select('id').neq('terlambat', 0);
+      PostgrestFilterBuilder q = _client
+          .from('peminjaman')
+          .select('id')
+          .neq('terlambat', 0);
 
       if (role == 'Peminjam' && userId != null) q = q.eq('user', userId);
 
@@ -302,7 +330,9 @@ class SupabaseService {
     }
   }
 
-  static Future<Map<String, int>> getDashboardStats({required String role}) async {
+  static Future<Map<String, int>> getDashboardStats({
+    required String role,
+  }) async {
     try {
       final userId = await getUserId();
 
@@ -310,10 +340,19 @@ class SupabaseService {
       final totalEquipment = (totalEquipmentRes as List).length;
 
       final activeLoans = await _countLoansByStatus(
-          status: 'dipinjam', role: role, userId: userId);
+        status: 'dipinjam',
+        role: role,
+        userId: userId,
+      );
       final pendingApprovals = await _countLoansByStatus(
-          status: 'menunggu', role: role, userId: userId);
-      final overdueReturns = await _countOverdueByColumn(role: role, userId: userId);
+        status: 'menunggu',
+        role: role,
+        userId: userId,
+      );
+      final overdueReturns = await _countOverdueByColumn(
+        role: role,
+        userId: userId,
+      );
 
       return {
         'totalEquipment': totalEquipment,
@@ -327,13 +366,15 @@ class SupabaseService {
         'totalEquipment': 0,
         'activeLoans': 0,
         'pendingApprovals': 0,
-        'overdueReturns': 0
+        'overdueReturns': 0,
       };
     }
   }
 
-  static Future<List<Map<String, dynamic>>> getDashboardActivities(
-      {required String role, int limit = 5}) async {
+  static Future<List<Map<String, dynamic>>> getDashboardActivities({
+    required String role,
+    int limit = 5,
+  }) async {
     try {
       final userId = await getUserId();
 
@@ -350,9 +391,12 @@ class SupabaseService {
         user:user ( username )
       ''');
 
-      if (role == 'Peminjam' && userId != null) baseQuery = baseQuery.eq('user', userId);
+      if (role == 'Peminjam' && userId != null)
+        baseQuery = baseQuery.eq('user', userId);
 
-      final data = await baseQuery.order('created_at', ascending: false).limit(limit);
+      final data = await baseQuery
+          .order('created_at', ascending: false)
+          .limit(limit);
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
       debugPrint('❌ DASHBOARD ACTIVITIES ERROR: $e');
@@ -420,11 +464,10 @@ class SupabaseService {
 
       final oldUsername = before?['username']?.toString() ?? username;
 
-      await _client.from('user').update({
-        'username': username,
-        'password': password,
-        'role': role,
-      }).eq('id', id);
+      await _client
+          .from('user')
+          .update({'username': username, 'password': password, 'role': role})
+          .eq('id', id);
 
       // ✅ log
       await insertLog(description: 'Mengedit User $oldUsername');
@@ -462,15 +505,14 @@ class SupabaseService {
 
   // ================= CATEGORY MANAGEMENT =================
   Future<List<Category>> getCategories() async {
-    final response =
-        await _client.from('kategori_alat').select().order('id', ascending: true);
+    final response = await _client
+        .from('kategori_alat')
+        .select()
+        .order('id', ascending: true);
 
     final data = response as List<dynamic>;
     return data.map((e) {
-      return Category(
-        id: e['id'].toString(),
-        name: e['kategori'] ?? '',
-      );
+      return Category(id: e['id'].toString(), name: e['kategori'] ?? '');
     }).toList();
   }
 
@@ -484,10 +526,7 @@ class SupabaseService {
     // ✅ log
     await SupabaseService.insertLog(description: 'Menambah kategori $name');
 
-    return Category(
-      id: response['id'].toString(),
-      name: response['kategori'],
-    );
+    return Category(id: response['id'].toString(), name: response['kategori']);
   }
 
   Future<Category> editCategory(String id, String name) async {
@@ -509,10 +548,7 @@ class SupabaseService {
     // ✅ log
     await SupabaseService.insertLog(description: 'Mengedit kategori $oldName');
 
-    return Category(
-      id: response['id'].toString(),
-      name: response['kategori'],
-    );
+    return Category(id: response['id'].toString(), name: response['kategori']);
   }
 
   Future<void> deleteCategory(String id) async {
@@ -553,7 +589,9 @@ class SupabaseService {
     final filePath = '$safeName.jpg';
 
     try {
-      await _client.storage.from('Image').uploadBinary(
+      await _client.storage
+          .from('Image')
+          .uploadBinary(
             filePath,
             bytes,
             fileOptions: const FileOptions(upsert: true),
@@ -599,14 +637,18 @@ class SupabaseService {
     required int perbaikan,
     String fotoUrl = '',
   }) async {
-    final res = await _client.from('alat').insert({
-      'nama_alat': namaAlat,
-      'status': status,
-      'kategori': kategoriId,
-      'denda': denda,
-      'perbaikan': perbaikan,
-      'foto_url': fotoUrl,
-    }).select().single();
+    final res = await _client
+        .from('alat')
+        .insert({
+          'nama_alat': namaAlat,
+          'status': status,
+          'kategori': kategoriId,
+          'denda': denda,
+          'perbaikan': perbaikan,
+          'foto_url': fotoUrl,
+        })
+        .select()
+        .single();
 
     // ✅ log
     await SupabaseService.insertLog(description: 'Menambah Alat $namaAlat');
@@ -631,14 +673,19 @@ class SupabaseService {
         .maybeSingle();
     final oldName = before?['nama_alat']?.toString() ?? namaAlat;
 
-    final res = await _client.from('alat').update({
-      'nama_alat': namaAlat,
-      'status': status,
-      'kategori': kategoriId,
-      'foto_url': image,
-      'denda': denda,
-      'perbaikan': perbaikan,
-    }).eq('id', id).select().single();
+    final res = await _client
+        .from('alat')
+        .update({
+          'nama_alat': namaAlat,
+          'status': status,
+          'kategori': kategoriId,
+          'foto_url': image,
+          'denda': denda,
+          'perbaikan': perbaikan,
+        })
+        .eq('id', id)
+        .select()
+        .single();
 
     // ✅ log
     await SupabaseService.insertLog(description: 'Mengedit Alat $oldName');
@@ -697,7 +744,9 @@ class SupabaseService {
       ''');
 
       final res = (role == 'Peminjam' && userId != null)
-          ? await selectQuery.eq('user', userId).order('created_at', ascending: false)
+          ? await selectQuery
+                .eq('user', userId)
+                .order('created_at', ascending: false)
           : await selectQuery.order('created_at', ascending: false);
 
       final list = List<Map<String, dynamic>>.from(res);
@@ -733,7 +782,9 @@ class SupabaseService {
           .eq('username', username)
           .maybeSingle();
       if (res == null) return null;
-      return (res['id'] is int) ? res['id'] : int.tryParse(res['id'].toString());
+      return (res['id'] is int)
+          ? res['id']
+          : int.tryParse(res['id'].toString());
     } catch (e) {
       debugPrint('❌ findUserIdByUsername ERROR: $e');
       return null;
@@ -748,7 +799,9 @@ class SupabaseService {
           .eq('nama_alat', namaAlat)
           .maybeSingle();
       if (res == null) return null;
-      return (res['id'] is int) ? res['id'] : int.tryParse(res['id'].toString());
+      return (res['id'] is int)
+          ? res['id']
+          : int.tryParse(res['id'].toString());
     } catch (e) {
       debugPrint('❌ findAlatIdByNama ERROR: $e');
       return null;
@@ -764,15 +817,18 @@ class SupabaseService {
     required String alasan,
     required String status,
   }) async {
-    final inserted = await _client.from('peminjaman').insert({
-      'user': userId,
-      'alat': alatId,
-      'tanggal_pinjam': tanggalPinjam,
-      'tanggal_kembali': tanggalKembali,
-      'tanggal_pengembalian': tanggalPengembalian,
-      'alasan': alasan,
-      'status': status,
-    }).select('''
+    final inserted = await _client
+        .from('peminjaman')
+        .insert({
+          'user': userId,
+          'alat': alatId,
+          'tanggal_pinjam': tanggalPinjam,
+          'tanggal_kembali': tanggalKembali,
+          'tanggal_pengembalian': tanggalPengembalian,
+          'alasan': alasan,
+          'status': status,
+        })
+        .select('''
       id,
       status,
       tanggal_pinjam,
@@ -781,13 +837,18 @@ class SupabaseService {
       alasan,
       user:user ( id, username ),
       alat:alat ( id, nama_alat )
-    ''').single();
+    ''')
+        .single();
 
-    final namaAlat = inserted['alat']?['nama_alat']?.toString() ?? 'Alat#$alatId';
-    final namaPeminjam = inserted['user']?['username']?.toString() ?? 'User#$userId';
+    final namaAlat =
+        inserted['alat']?['nama_alat']?.toString() ?? 'Alat#$alatId';
+    final namaPeminjam =
+        inserted['user']?['username']?.toString() ?? 'User#$userId';
 
     // ✅ log
-    await insertLog(description: 'Menambah peminjaman $namaAlat milik $namaPeminjam');
+    await insertLog(
+      description: 'Menambah peminjaman $namaAlat milik $namaPeminjam',
+    );
 
     return {
       'id': inserted['id'],
@@ -812,16 +873,22 @@ class SupabaseService {
     String? tanggalPengembalian,
     required String alasan,
     required String status,
+    bool? rusak,
   }) async {
-    final updated = await _client.from('peminjaman').update({
-      'user': userId,
-      'alat': alatId,
-      'tanggal_pinjam': tanggalPinjam,
-      'tanggal_kembali': tanggalKembali,
-      'tanggal_pengembalian': tanggalPengembalian,
-      'alasan': alasan,
-      'status': status,
-    }).eq('id', id).select('''
+    final updated = await _client
+        .from('peminjaman')
+        .update({
+          'user': userId,
+          'alat': alatId,
+          'tanggal_pinjam': tanggalPinjam,
+          'tanggal_kembali': tanggalKembali,
+          'tanggal_pengembalian': tanggalPengembalian,
+          'alasan': alasan,
+          'status': status,
+          'rusak': rusak ?? false,
+        })
+        .eq('id', id)
+        .select('''
       id,
       status,
       tanggal_pinjam,
@@ -830,13 +897,18 @@ class SupabaseService {
       alasan,
       user:user ( id, username ),
       alat:alat ( id, nama_alat )
-    ''').single();
+    ''')
+        .single();
 
-    final namaAlat = updated['alat']?['nama_alat']?.toString() ?? 'Alat#$alatId';
-    final namaPeminjam = updated['user']?['username']?.toString() ?? 'User#$userId';
+    final namaAlat =
+        updated['alat']?['nama_alat']?.toString() ?? 'Alat#$alatId';
+    final namaPeminjam =
+        updated['user']?['username']?.toString() ?? 'User#$userId';
 
     // ✅ log
-    await insertLog(description: 'Mengedit peminjaman $namaAlat milik $namaPeminjam');
+    await insertLog(
+      description: 'Mengedit peminjaman $namaAlat milik $namaPeminjam',
+    );
 
     return {
       'id': updated['id'],
@@ -848,18 +920,22 @@ class SupabaseService {
       'user_id': updated['user']?['id'],
       'username': updated['user']?['username'],
       'alat_id': updated['alat']?['id'],
-      'nama_alat': updated['alat']?['nama_alat'],
+      'nama_alat': updated['alat']?['nama_alat']
     };
   }
 
   static Future<void> deletePeminjaman({required dynamic id}) async {
     // ambil data sebelum dihapus biar log lengkap
     try {
-      final before = await _client.from('peminjaman').select('''
+      final before = await _client
+          .from('peminjaman')
+          .select('''
         id,
         user:user ( username ),
         alat:alat ( nama_alat )
-      ''').eq('id', id).maybeSingle();
+      ''')
+          .eq('id', id)
+          .maybeSingle();
 
       final namaAlat = before?['alat']?['nama_alat']?.toString() ?? 'Alat';
       final namaPeminjam = before?['user']?['username']?.toString() ?? 'User';
@@ -867,7 +943,9 @@ class SupabaseService {
       await _client.from('peminjaman').delete().eq('id', id);
 
       // ✅ log
-      await insertLog(description: 'Menghapus peminjaman $namaAlat milik $namaPeminjam');
+      await insertLog(
+        description: 'Menghapus peminjaman $namaAlat milik $namaPeminjam',
+      );
     } catch (e) {
       // fallback: tetap hapus
       await _client.from('peminjaman').delete().eq('id', id);
@@ -883,6 +961,62 @@ class SupabaseService {
 
     return List<Map<String, dynamic>>.from(res);
   }
+
+// ================= LAPORAN =================
+static DateTime _startDateFromPeriod(String timePeriod) {
+  final now = DateTime.now();
+  DateTime start;
+
+  switch (timePeriod) {
+    case 'week':
+      start = now.subtract(Duration(days: now.weekday - 1));
+      break;
+    case 'month':
+      start = DateTime(now.year, now.month, 1);
+      break;
+    case 'year':
+      start = DateTime(now.year, 1, 1);
+      break;
+    default:
+      start = DateTime(now.year, now.month, 1);
+  }
+  return DateTime(start.year, start.month, start.day);
+}
+
+static Future<List<Map<String, dynamic>>> getLaporanRaw({
+  required String timePeriod,
+}) async {
+  try {
+    final start = _startDateFromPeriod(timePeriod);
+    final role = await getRole();
+    final userId = await getUserId();
+
+    PostgrestFilterBuilder q = _client.from('peminjaman').select('''
+      id,
+      status,
+      tanggal_pinjam,
+      tanggal_kembali,
+      tanggal_pengembalian,
+      terlambat,
+      denda,
+      user:user ( id, username ),
+      alat:alat ( id, nama_alat, kategori, kategori_alat ( id, kategori ) ),
+      created_at
+    ''');
+
+    q = q.gte('created_at', start.toIso8601String());
+
+    if ((role ?? '').toLowerCase() == 'peminjam' && userId != null) {
+      q = q.eq('user', userId);
+    }
+
+    final res = await q.order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(res);
+  } catch (e) {
+    debugPrint('❌ GET LAPORAN RAW ERROR: $e');
+    return [];
+  }
+}
 
   // ================= LOGOUT =================
   static Future<void> logout() async {
