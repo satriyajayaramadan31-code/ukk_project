@@ -150,9 +150,9 @@ class _LaporanPageState extends State<LaporanPage> {
     } catch (e) {
       debugPrint("❌ LOAD REPORT ERROR: $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Gagal memuat laporan: $e")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Gagal memuat laporan: $e")));
       }
     }
 
@@ -189,9 +189,11 @@ class _LaporanPageState extends State<LaporanPage> {
 
       map[alatId] = current.copyWith(
         totalLoans: current.totalLoans + 1,
-        activeLoans: current.activeLoans +
+        activeLoans:
+            current.activeLoans +
             ((status == 'dipinjam' || status == 'menunggu') ? 1 : 0),
-        completedLoans: current.completedLoans +
+        completedLoans:
+            current.completedLoans +
             ((status == 'dikembalikan' || status == 'selesai') ? 1 : 0),
         rejectedLoans: current.rejectedLoans + (status == 'ditolak' ? 1 : 0),
         overdueLoans: current.overdueLoans + terlambat,
@@ -209,17 +211,18 @@ class _LaporanPageState extends State<LaporanPage> {
       final username = user?['username']?.toString() ?? 'Tidak diketahui';
 
       map.putIfAbsent(
-          userId,
-          () => ReportData(
-                id: userId,
-                label: username,
-                totalLoans: 0,
-                activeLoans: 0,
-                completedLoans: 0,
-                rejectedLoans: 0,
-                overdueLoans: 0,
-                overdueCount: 0,
-              ));
+        userId,
+        () => ReportData(
+          id: userId,
+          label: username,
+          totalLoans: 0,
+          activeLoans: 0,
+          completedLoans: 0,
+          rejectedLoans: 0,
+          overdueLoans: 0,
+          overdueCount: 0,
+        ),
+      );
 
       final current = map[userId]!;
       final status = (row['status'] ?? '').toString().toLowerCase();
@@ -228,9 +231,11 @@ class _LaporanPageState extends State<LaporanPage> {
 
       map[userId] = current.copyWith(
         totalLoans: current.totalLoans + 1,
-        activeLoans: current.activeLoans +
+        activeLoans:
+            current.activeLoans +
             ((status == 'dipinjam' || status == 'menunggu') ? 1 : 0),
-        completedLoans: current.completedLoans +
+        completedLoans:
+            current.completedLoans +
             ((status == 'dikembalikan' || status == 'selesai') ? 1 : 0),
         rejectedLoans: current.rejectedLoans + (status == 'ditolak' ? 1 : 0),
         overdueLoans: current.overdueLoans + terlambat,
@@ -247,21 +252,24 @@ class _LaporanPageState extends State<LaporanPage> {
       final alat = row['alat'];
       final kategoriObj = alat?['kategori_alat'];
       final catId =
-          kategoriObj?['id']?.toString() ?? alat?['kategori']?.toString() ?? 'unknown';
+          kategoriObj?['id']?.toString() ??
+          alat?['kategori']?.toString() ??
+          'unknown';
       final catName = kategoriObj?['kategori']?.toString() ?? 'Tidak diketahui';
 
       map.putIfAbsent(
-          catId,
-          () => ReportData(
-                id: catId,
-                label: catName,
-                totalLoans: 0,
-                activeLoans: 0,
-                completedLoans: 0,
-                rejectedLoans: 0,
-                overdueLoans: 0,
-                overdueCount: 0,
-              ));
+        catId,
+        () => ReportData(
+          id: catId,
+          label: catName,
+          totalLoans: 0,
+          activeLoans: 0,
+          completedLoans: 0,
+          rejectedLoans: 0,
+          overdueLoans: 0,
+          overdueCount: 0,
+        ),
+      );
 
       final current = map[catId]!;
       final status = (row['status'] ?? '').toString().toLowerCase();
@@ -270,9 +278,11 @@ class _LaporanPageState extends State<LaporanPage> {
 
       map[catId] = current.copyWith(
         totalLoans: current.totalLoans + 1,
-        activeLoans: current.activeLoans +
+        activeLoans:
+            current.activeLoans +
             ((status == 'dipinjam' || status == 'menunggu') ? 1 : 0),
-        completedLoans: current.completedLoans +
+        completedLoans:
+            current.completedLoans +
             ((status == 'dikembalikan' || status == 'selesai') ? 1 : 0),
         rejectedLoans: current.rejectedLoans + (status == 'ditolak' ? 1 : 0),
         overdueLoans: current.overdueLoans + terlambat,
@@ -294,8 +304,15 @@ class _LaporanPageState extends State<LaporanPage> {
           pw.Text("Periode: $timePeriod"),
           pw.SizedBox(height: 10),
 
-          pw.Table.fromTextArray(
-            headers: ["Total", "Aktif", "Selesai", "Ditolak", "Terlambat", "Total Denda"],
+          pw.TableHelper.fromTextArray(
+            headers: [
+              "Total",
+              "Aktif",
+              "Selesai",
+              "Ditolak",
+              "Terlambat",
+              "Total Denda",
+            ],
             data: [
               [
                 totalLoans.toString(),
@@ -304,23 +321,32 @@ class _LaporanPageState extends State<LaporanPage> {
                 rejectedLoans.toString(),
                 overdueLoans.toString(),
                 formatCurrency(totalFines),
-              ]
+              ],
             ],
           ),
           pw.SizedBox(height: 10),
 
           pw.Text("Laporan Utama"),
           pw.Table.fromTextArray(
-            headers: [_mainTitle(), "Total", "Aktif", "Selesai", "Ditolak", "Terlambat"],
+            headers: [
+              _mainTitle(),
+              "Total",
+              "Aktif",
+              "Selesai",
+              "Ditolak",
+              "Terlambat",
+            ],
             data: mainReports
-                .map((r) => [
-                      r.label,
-                      r.totalLoans.toString(),
-                      r.activeLoans.toString(),
-                      r.completedLoans.toString(),
-                      r.rejectedLoans.toString(),
-                      r.overdueCount.toString()
-                    ])
+                .map(
+                  (r) => [
+                    r.label,
+                    r.totalLoans.toString(),
+                    r.activeLoans.toString(),
+                    r.completedLoans.toString(),
+                    r.rejectedLoans.toString(),
+                    r.overdueCount.toString(),
+                  ],
+                )
                 .toList(),
           ),
           pw.SizedBox(height: 10),
@@ -328,14 +354,18 @@ class _LaporanPageState extends State<LaporanPage> {
           pw.Text("Alat Paling Populer"),
           pw.Table.fromTextArray(
             headers: ["Nama Alat", "Total Pinjam"],
-            data: popularEquipment.map((r) => [r.label, r.totalLoans.toString()]).toList(),
+            data: popularEquipment
+                .map((r) => [r.label, r.totalLoans.toString()])
+                .toList(),
           ),
           pw.SizedBox(height: 10),
 
           pw.Text("Perlu Perhatian"),
           pw.Table.fromTextArray(
             headers: ["Nama Alat", "Terlambat"],
-            data: needAttention.map((r) => [r.label, r.overdueCount.toString()]).toList(),
+            data: needAttention
+                .map((r) => [r.label, r.overdueCount.toString()])
+                .toList(),
           ),
         ],
       ),
@@ -406,13 +436,22 @@ class _LaporanPageState extends State<LaporanPage> {
                           initialValue: reportType,
                           decoration: const InputDecoration(
                             labelText: "Jenis Laporan",
-                            
+                            fillColor: AppTheme.background,
                             border: OutlineInputBorder(),
                           ),
                           items: const [
-                            DropdownMenuItem(value: "equipment", child: Text("Alat")),
-                            DropdownMenuItem(value: "user", child: Text("Pengguna")),
-                            DropdownMenuItem(value: "category", child: Text("Kategori")),
+                            DropdownMenuItem(
+                              value: "equipment",
+                              child: Text("Alat"),
+                            ),
+                            DropdownMenuItem(
+                              value: "user",
+                              child: Text("Pengguna"),
+                            ),
+                            DropdownMenuItem(
+                              value: "category",
+                              child: Text("Kategori"),
+                            ),
                           ],
                           onChanged: (v) async {
                             if (v == null) return;
@@ -428,12 +467,22 @@ class _LaporanPageState extends State<LaporanPage> {
                           initialValue: timePeriod,
                           decoration: const InputDecoration(
                             labelText: "Periode",
+                            fillColor: AppTheme.background,
                             border: OutlineInputBorder(),
                           ),
                           items: const [
-                            DropdownMenuItem(value: "week", child: Text("Minggu Ini")),
-                            DropdownMenuItem(value: "month", child: Text("Bulan Ini")),
-                            DropdownMenuItem(value: "year", child: Text("Tahun Ini")),
+                            DropdownMenuItem(
+                              value: "week",
+                              child: Text("Minggu Ini"),
+                            ),
+                            DropdownMenuItem(
+                              value: "month",
+                              child: Text("Bulan Ini"),
+                            ),
+                            DropdownMenuItem(
+                              value: "year",
+                              child: Text("Tahun Ini"),
+                            ),
                           ],
                           onChanged: (v) async {
                             if (v == null) return;
@@ -463,16 +512,30 @@ class _LaporanPageState extends State<LaporanPage> {
                     final spacing = 14.0;
                     final width = constraints.maxWidth;
                     double span(int s) =>
-                        ((width - spacing * (crossAxisCount - 1)) / crossAxisCount * s) +
+                        ((width - spacing * (crossAxisCount - 1)) /
+                            crossAxisCount *
+                            s) +
                         spacing * (s - 1);
 
                     return Wrap(
                       spacing: spacing,
                       runSpacing: spacing,
                       children: [
-                        _box(span(1), "Total Peminjaman", totalLoans.toString()),
-                        _box(span(1), "Sedang Dipinjam", activeLoans.toString()),
-                        _box(span(1), "Dikembalikan", completedLoans.toString()),
+                        _box(
+                          span(1),
+                          "Total Peminjaman",
+                          totalLoans.toString(),
+                        ),
+                        _box(
+                          span(1),
+                          "Sedang Dipinjam",
+                          activeLoans.toString(),
+                        ),
+                        _box(
+                          span(1),
+                          "Dikembalikan",
+                          completedLoans.toString(),
+                        ),
                         _box(span(1), "Terlambat", overdueLoans.toString()),
                         _box(
                           span(crossAxisCount >= 3 ? 2 : crossAxisCount),
@@ -511,8 +574,10 @@ class _LaporanPageState extends State<LaporanPage> {
     );
   }
 
-  Widget _box(double width, String t, String v) =>
-      SizedBox(width: width, child: _StatCard(title: t, value: v));
+  Widget _box(double width, String t, String v) => SizedBox(
+    width: width,
+    child: _StatCard(title: t, value: v),
+  );
 }
 
 /* ===================== TABLE UTAMA ===================== */
@@ -533,6 +598,10 @@ class _MainTable extends StatelessWidget {
           child: DataTable(
             headingTextStyle: text.bodyMedium,
             dataTextStyle: text.bodyMedium,
+            border: const TableBorder(
+              bottom: BorderSide(color: Colors.black, width: 1),
+              horizontalInside: BorderSide(color: Colors.black, width: 1),
+            ),
             columnSpacing: 24,
             columns: [
               DataColumn(label: Text(titleCol)),
@@ -543,14 +612,18 @@ class _MainTable extends StatelessWidget {
               const DataColumn(label: Text("Terlambat")),
             ],
             rows: data
-                .map((r) => DataRow(cells: [
+                .map(
+                  (r) => DataRow(
+                    cells: [
                       DataCell(Text(r.label)),
                       DataCell(Text(r.totalLoans.toString())),
                       DataCell(Text(r.activeLoans.toString())),
                       DataCell(Text(r.completedLoans.toString())),
                       DataCell(Text(r.rejectedLoans.toString())),
                       DataCell(Text(r.overdueCount.toString())),
-                    ]))
+                    ],
+                  ),
+                )
                 .toList(),
           ),
         ),
@@ -575,15 +648,9 @@ class _StatCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: text.bodyMedium,
-            ),
+            Text(title, style: text.bodyMedium),
             const SizedBox(height: 8),
-            Text(
-              value,
-              style: text.headlineMedium,
-            ),
+            Text(value, style: text.headlineMedium),
           ],
         ),
       ),
@@ -623,14 +690,28 @@ class _InsightTable extends StatelessWidget {
                 headingTextStyle: text.bodyMedium,
                 dataTextStyle: text.bodyMedium,
                 columnSpacing: 24,
-                columns: columns.map((c) => DataColumn(label: Text(c))).toList(),
+                border: const TableBorder(
+                  bottom: BorderSide(color: Colors.black, width: 1),
+                  horizontalInside: BorderSide(color: Colors.black, width: 1),
+                ),
+                columns: columns
+                    .map((c) => DataColumn(label: Text(c)))
+                    .toList(),
                 rows: rows
-                    .map((r) => DataRow(cells: [
+                    .map(
+                      (r) => DataRow(
+                        cells: [
                           DataCell(Text(r.label)),
                           DataCell(
-                            Text(isPopular ? r.totalLoans.toString() : r.overdueCount.toString()),
+                            Text(
+                              isPopular
+                                  ? r.totalLoans.toString()
+                                  : r.overdueCount.toString(),
+                            ),
                           ),
-                        ]))
+                        ],
+                      ),
+                    )
                     .toList(),
               ),
             ),
