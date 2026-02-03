@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../widget/app_bar.dart';
 import '../widget/side_menu.dart';
 import '../utils/theme.dart';
 import '../widget/borrow_request.dart';
+import 'package:engine_rent_app/service/supabase_service.dart';
 
 class Equipment {
   final String id;
@@ -18,6 +23,16 @@ class Equipment {
     required this.image,
     required this.status,
   });
+
+  factory Equipment.fromAlat(Alat a) {
+    return Equipment(
+      id: a.id,
+      name: a.namaAlat,
+      category: a.kategoriNama,
+      image: a.fotoUrl,
+      status: a.status,
+    );
+  }
 }
 
 class AlatPage extends StatefulWidget {
@@ -29,57 +44,64 @@ class AlatPage extends StatefulWidget {
 
 class _AlatPageState extends State<AlatPage> {
   String searchTerm = "";
+  bool isLoading = true;
 
-  final List<Equipment> equipmentList = [
-    Equipment(
-      id: "1",
-      name: "Laptop Dell XPS 15",
-      category: "Elektronik",
-      image:
-          "https://images.unsplash.com/photo-1762117666457-919e7345bd90?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsYXB0b3AlMjBjb21wdXRlciUyMGRldmljZXxlbnwxfHx8fDE3Njc5MTkwNzh8MA&ixlib=rb-4.1.0&q=80&w=1080",
-      status: "Tersedia",
-    ),
-    Equipment(
-      id: "2",
-      name: "Kamera DSLR Canon",
-      category: "Fotografi",
-      image:
-          "https://images.unsplash.com/photo-1764557359097-f15dd0c0a17b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjYW1lcmElMjBwaG90b2dyYXBoeSUyMGVxdWlwbWVudHxlbnwxfHx8fDE3Njc4MzY2Mjh8MA&ixlib=rb-4.1.0&q=80&w=1080",
-      status: "Tersedia",
-    ),
-    Equipment(
-      id: "3",
-      name: "Proyektor Epson",
-      category: "Presentasi",
-      image:
-          "https://images.unsplash.com/photo-1761388559873-40bfb05f39e8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwcm9qZWN0b3IlMjBwcmVzZW50YXRpb24lMjBlcXVpcG1lbnR8ZW58MXx8fHwxNzY3OTE5MDc4fDA&ixlib=rb-4.1.0&q=80&w=1080",
-      status: "Dipinjam",
-    ),
-    Equipment(
-      id: "4",
-      name: "Bor Listrik Bosch",
-      category: "Perkakas",
-      image:
-          "https://images.unsplash.com/photo-1593307315564-c96172dc89dc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwb3dlciUyMGRyaWxsJTIwdG9vbHxlbnwxfHx8fDE3Njc5MTAwOTN8MA&ixlib=rb-4.1.0&q=80&w=1080",
-      status: "Tersedia",
-    ),
-    Equipment(
-      id: "5",
-      name: "Meteran Laser Digital",
-      category: "Perkakas",
-      image:
-          "https://images.unsplash.com/photo-1651004926916-b4e92f4df1ca?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZWFzdXJpbmclMjB0YXBlJTIwdG9vbHN8ZW58MXx8fHwxNzY3OTE2MzAwfDA&ixlib=rb-4.1.0&q=80&w=1080",
-      status: "Tersedia",
-    ),
-    Equipment(
-      id: "6",
-      name: "Mikrofon Wireless Shure",
-      category: "Audio",
-      image:
-          "https://images.unsplash.com/photo-1764557206659-1def036068ef?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtaWNyb3Bob25lJTIwYXVkaW8lMjBlcXVpcG1lbnR8ZW58MXx8fHwxNzY3OTE5MDc5fDA&ixlib=rb-4.1.0&q=80&w=1080",
-      status: "Maintenance",
-    ),
-  ];
+  final SupabaseService service = SupabaseService();
+  List<Equipment> equipmentList = [];
+
+  RealtimeChannel? _alatChannel;
+  Timer? _debounceTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAlat();
+    _setupRealtime();
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    if (_alatChannel != null) {
+      Supabase.instance.client.removeChannel(_alatChannel!);
+    }
+    super.dispose();
+  }
+
+  void _setupRealtime() {
+    final supabase = Supabase.instance.client;
+
+    _alatChannel = supabase.channel('realtime-alat');
+
+    _alatChannel!
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'alat',
+          callback: (payload) {
+            _debounceTimer?.cancel();
+            _debounceTimer = Timer(const Duration(milliseconds: 250), () async {
+              await _loadAlat(showLoading: false);
+            });
+          },
+        )
+        .subscribe();
+  }
+
+  Future<void> _loadAlat({bool showLoading = true}) async {
+    if (showLoading) {
+      setState(() => isLoading = true);
+    }
+
+    final alatList = await service.getAlat();
+    final mapped = alatList.map((a) => Equipment.fromAlat(a)).toList();
+
+    if (!mounted) return;
+    setState(() {
+      equipmentList = mapped;
+      isLoading = false;
+    });
+  }
 
   List<Equipment> get filteredEquipment {
     if (searchTerm.isEmpty) return equipmentList;
@@ -97,8 +119,8 @@ class _AlatPageState extends State<AlatPage> {
         return AppTheme.statusReturned;
       case "Dipinjam":
         return AppTheme.statusBorrowed;
-      case "Maintenance":
-        return AppTheme.statusPending;
+      case "Rusak":
+        return AppTheme.statusLate;
       default:
         return Colors.grey;
     }
@@ -108,6 +130,32 @@ class _AlatPageState extends State<AlatPage> {
     if (width < 500) return 1;
     if (width < 900) return 2;
     return 3;
+  }
+
+  /// SOLUSI 2: tinggi card fix.
+  /// Dibuat lebih tinggi supaya Row status+tombol tidak ketutup.
+  double getCardHeight(double width) {
+    if (width < 500) return 420; // 1 kolom (mobile)
+    if (width < 900) return 400; // 2 kolom
+    return 390; // 3 kolom
+  }
+
+  Widget _buildImage(String url) {
+    if (url.isEmpty) {
+      return const Center(child: Icon(Icons.image_not_supported));
+    }
+
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stack) {
+        return const Center(child: Icon(Icons.broken_image));
+      },
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return const Center(child: CircularProgressIndicator());
+      },
+    );
   }
 
   @override
@@ -122,13 +170,8 @@ class _AlatPageState extends State<AlatPage> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Search
             TextField(
-              onChanged: (value) {
-                setState(() {
-                  searchTerm = value;
-                });
-              },
+              onChanged: (value) => setState(() => searchTerm = value),
               decoration: const InputDecoration(
                 hintText: "Cari alat atau kategori...",
                 prefixIcon: Icon(Icons.search),
@@ -136,131 +179,187 @@ class _AlatPageState extends State<AlatPage> {
             ),
             const SizedBox(height: 16),
 
-            // Grid Alat (Responsive)
             Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final columns = getColumnCount(constraints.maxWidth);
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : RefreshIndicator(
+                      onRefresh: () => _loadAlat(showLoading: false),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final columns = getColumnCount(constraints.maxWidth);
+                          final cardHeight = getCardHeight(constraints.maxWidth);
 
-                  return GridView.builder(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columns,
-                      childAspectRatio: 0.82,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                    ),
-                    itemCount: filteredEquipment.length,
-                    itemBuilder: (context, index) {
-                      final item = filteredEquipment[index];
+                          if (filteredEquipment.isEmpty) {
+                            return ListView(
+                              children: const [
+                                SizedBox(height: 80),
+                                Center(child: Text("Data alat tidak ditemukan")),
+                              ],
+                            );
+                          }
 
-                      return Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(
-                            color: AppTheme.card,
-                            width: 1.2,
-                          ),
-                        ),
-                        clipBehavior: Clip.antiAlias, // biar rounded rapi
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // ====== IMAGE WITH BORDER ======
-                            AspectRatio(
-                              aspectRatio: 4 / 3,
-                              child: Padding(
-                                padding: const EdgeInsets.all(10),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: AppTheme.card,
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Image.network(
-                                      item.image,
-                                      fit: BoxFit.cover,
-                                    ),
+                          return GridView.builder(
+                            padding: const EdgeInsets.only(bottom: 24),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: columns,
+                              mainAxisExtent: cardHeight,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                            ),
+                            itemCount: filteredEquipment.length,
+                            itemBuilder: (context, index) {
+                              final item = filteredEquipment[index];
+
+                              return Card(
+                                elevation: 2,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(
+                                    color: AppTheme.card,
+                                    width: 1.2,
                                   ),
                                 ),
-                              ),
-                            ),
-
-                            Padding(
-                              padding: const EdgeInsets.all(14),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.name,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .headlineSmall,
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    item.category,
-                                    style:
-                                        Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                  const SizedBox(height: 14),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: getStatusColor(item.status),
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        child: Text(
-                                          item.status,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
+                                clipBehavior: Clip.antiAlias,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    AspectRatio(
+                                      aspectRatio: 4 / 3,
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(10),
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: AppTheme.card,
+                                              width: 1.5,
+                                            ),
+                                          ),
+                                          child: ClipRRect(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            child: _buildImage(item.image),
                                           ),
                                         ),
                                       ),
+                                    ),
 
-                                      // ========== PINJAM BUTTON ==========
-                                      ElevatedButton(
-                                        onPressed: item.status == "Tersedia"
-                                            ? () {
-                                                showDialog(
-                                                  context: context,
-                                                  builder: (context) {
-                                                    return BorrowRequest(
-                                                      equipment: item,
-                                                      onSubmit: () {},
-                                                    );
-                                                  },
-                                                );
-                                              }
-                                            : null,
-                                        child: const Text("Pinjam"),
+                                    // 🔥 ini penting: Expanded biar bagian bawah pasti kebagian ruang
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(14),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              item.name,
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .headlineSmall,
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              item.category,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall,
+                                            ),
+
+                                            const Spacer(), // dorong tombol ke bawah
+
+                                            Row(
+                                              children: [
+                                                // STATUS
+                                                SizedBox(
+                                                  height: 36,
+                                                  child: Container(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                      horizontal: 12,
+                                                    ),
+                                                    alignment: Alignment.center,
+                                                    decoration: BoxDecoration(
+                                                      color: getStatusColor(
+                                                          item.status),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              10),
+                                                    ),
+                                                    child: Text(
+                                                      item.status,
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const Spacer(),
+
+                                                // PINJAM
+                                                SizedBox(
+                                                  height: 36,
+                                                  child: ElevatedButton(
+                                                    style: ElevatedButton
+                                                        .styleFrom(
+                                                      padding: const EdgeInsets
+                                                          .symmetric(
+                                                        horizontal: 14,
+                                                      ),
+                                                      shape:
+                                                          RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(10),
+                                                      ),
+                                                    ),
+                                                    onPressed:
+                                                        item.status == "Tersedia"
+                                                            ? () {
+                                                                showDialog(
+                                                                  context:
+                                                                      context,
+                                                                  builder:
+                                                                      (context) {
+                                                                    return BorrowRequest(
+                                                                      equipment:
+                                                                          item,
+                                                                      onSubmit:
+                                                                          () async {
+                                                                        await _loadAlat(
+                                                                            showLoading:
+                                                                                false);
+                                                                      },
+                                                                    );
+                                                                  },
+                                                                );
+                                                              }
+                                                            : null,
+                                                    child: const Text("Pinjam"),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
             ),
           ],
         ),

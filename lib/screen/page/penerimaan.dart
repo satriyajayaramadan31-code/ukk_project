@@ -98,7 +98,7 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
           callback: (payload) {
             // Debounce supaya tidak spam _load() kalau banyak event
             _debounceReload?.cancel();
-            _debounceReload = Timer(const Duration(milliseconds: 400), () {
+            _debounceReload = Timer(const Duration(milliseconds: 300), () {
               if (mounted) _load(showLoading: false);
             });
           },
@@ -442,6 +442,7 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
                                   child: ElevatedButton(
                                     onPressed: () => _openDialog(r),
                                     style: ElevatedButton.styleFrom(
+                                      textStyle: theme.textTheme.bodyMedium,
                                       backgroundColor:
                                           theme.colorScheme.primary,
                                       padding: const EdgeInsets.symmetric(

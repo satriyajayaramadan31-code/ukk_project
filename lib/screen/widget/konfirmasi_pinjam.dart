@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 class KonfirmasiPinjamDialog extends StatelessWidget {
   final Map<String, dynamic> request;
   final VoidCallback onConfirm; // set status -> dikembalikan
-  final VoidCallback onReject; // set status -> dipinjam & rusak=false
+  final VoidCallback onReject; // set status -> ditolak / dll
 
   const KonfirmasiPinjamDialog({
     super.key,
@@ -105,17 +105,19 @@ class KonfirmasiPinjamDialog extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       backgroundColor: theme.scaffoldBackgroundColor,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.85,
+          maxWidth: 520,
         ),
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ===== Header (FIX overflow tombol close) =====
+              // ================= HEADER =================
               Row(
                 children: [
                   Expanded(
@@ -134,19 +136,20 @@ class KonfirmasiPinjamDialog extends StatelessWidget {
                 ],
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
-              Text("Peminjam", style: theme.textTheme.bodySmall),
+              // ================= CONTENT =================
+              Text("Peminjam", style: theme.textTheme.bodyMedium),
               const SizedBox(height: 4),
               Text(
                 (request['username'] ?? '-').toString(),
-                style: theme.textTheme.bodyMedium,
+                style: theme.textTheme.headlineSmall,
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
-              Text("Status", style: theme.textTheme.bodySmall),
-              const SizedBox(height: 4),
+              Text("Status", style: theme.textTheme.bodyMedium),
+              const SizedBox(height: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
@@ -155,104 +158,83 @@ class KonfirmasiPinjamDialog extends StatelessWidget {
                 ),
                 child: Text(
                   statusText,
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  style: theme.textTheme.headlineSmall?.copyWith(
                     color: Colors.white,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
-              Text("Nama Alat", style: theme.textTheme.bodySmall),
+              Text("Nama Alat", style: theme.textTheme.bodyMedium),
               const SizedBox(height: 4),
               Text(
                 (request['nama_alat'] ?? '-').toString(),
-                style: theme.textTheme.bodyMedium,
+                style: theme.textTheme.headlineSmall,
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 14),
 
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Tanggal Pinjam", style: theme.textTheme.bodySmall),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatDate(request['tanggal_pinjam']),
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text("Tanggal Kembali", style: theme.textTheme.bodySmall),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatDate(request['tanggal_kembali']),
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text("Dikembalikan", style: theme.textTheme.bodySmall),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatDate(request['tanggal_pengembalian']),
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ],
+              _infoBlock(
+                theme: theme,
+                label: "Tanggal Pinjam",
+                value: _formatDate(request['tanggal_pinjam']),
+              ),
+              _infoBlock(
+                theme: theme,
+                label: "Tanggal Kembali",
+                value: _formatDate(request['tanggal_kembali']),
+              ),
+              _infoBlock(
+                theme: theme,
+                label: "Dikembalikan",
+                value: _formatDate(request['tanggal_pengembalian']),
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
               Row(
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Keterlambatan", style: theme.textTheme.bodySmall),
-                        const SizedBox(height: 4),
-                        Text(
-                          "$lateDays hari",
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                      ],
+                    child: _infoMini(
+                      theme: theme,
+                      label: "Keterlambatan",
+                      value: "$lateDays hari",
                     ),
                   ),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Kondisi Alat", style: theme.textTheme.bodySmall),
-                        const SizedBox(height: 4),
-                        Text(
-                          isBroken ? "Rusak" : "Baik",
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                      ],
+                    child: _infoMini(
+                      theme: theme,
+                      label: "Kondisi Alat",
+                      value: isBroken ? "Rusak" : "Baik",
                     ),
                   ),
                 ],
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 14),
 
-              Text("Tujuan Peminjaman", style: theme.textTheme.bodySmall),
-              const SizedBox(height: 4),
+              Text("Tujuan Peminjaman", style: theme.textTheme.bodyMedium),
+              const SizedBox(height: 6),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppTheme.textSecondary.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: theme.colorScheme.primary),
                 ),
                 child: Text(
                   (request['alasan'] ?? '-').toString(),
-                  style: theme.textTheme.bodyMedium,
-                  textAlign: TextAlign.start,
+                  style: theme.textTheme.headlineSmall,
                   softWrap: true,
                 ),
               ),
 
               const SizedBox(height: 16),
 
+              // ================= ACTION BUTTONS (SCROLLABLE) =================
               Row(
                 children: [
                   Expanded(
@@ -261,20 +243,23 @@ class KonfirmasiPinjamDialog extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: theme.colorScheme.primary,
                         padding: const EdgeInsets.symmetric(vertical: 10),
+                        textStyle: theme.textTheme.bodyMedium,
                       ),
                       child: const Text("Dikembalikan"),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: ElevatedButton(
+                    child: OutlinedButton(
                       onPressed: onReject,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.scaffoldBackgroundColor,
+                      style: OutlinedButton.styleFrom(
                         foregroundColor: theme.colorScheme.primary,
-                        elevation: 0,
-                        side: const BorderSide(color: Color(0xFF374151)),
+                        side: BorderSide(color: theme.colorScheme.primary),
+                        textStyle: theme.textTheme.bodyMedium,
                         padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                       child: const Text("Tolak"),
                     ),
@@ -284,6 +269,44 @@ class KonfirmasiPinjamDialog extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _infoBlock({
+    required ThemeData theme,
+    required String label,
+    required String value,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: theme.textTheme.bodyMedium),
+          const SizedBox(height: 4),
+          Text(value, style: theme.textTheme.headlineSmall),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoMini({
+    required ThemeData theme,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: theme.textTheme.bodyMedium),
+          const SizedBox(height: 4),
+          Text(value, style: theme.textTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          )),
+        ],
       ),
     );
   }

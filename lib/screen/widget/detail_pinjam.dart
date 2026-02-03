@@ -1,3 +1,4 @@
+import 'package:engine_rent_app/screen/utils/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -48,6 +49,11 @@ class DetailPinjamDialog extends StatelessWidget {
     return rusak.toString().toLowerCase() == 'true';
   }
 
+  String _capitalize(String text) {
+    if (text.isEmpty) return text;
+    return text[0].toUpperCase() + text.substring(1).toLowerCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -69,23 +75,23 @@ class DetailPinjamDialog extends StatelessWidget {
               Center(
                 child: Text(
                   "Detail Peminjaman",
-                  style: theme.textTheme.headlineSmall,
+                  style: theme.textTheme.headlineMedium,
                 ),
               ),
               const SizedBox(height: 16),
 
               // ===== PEMINJAM =====
-              Text("Peminjam", style: theme.textTheme.bodySmall),
+              Text("Peminjam", style: theme.textTheme.bodyMedium),
               const SizedBox(height: 4),
               Text(
                 (request['username'] ?? '-').toString(),
-                style: theme.textTheme.bodyMedium,
+                style: theme.textTheme.headlineSmall,
               ),
 
               const SizedBox(height: 10),
 
               // ===== STATUS =====
-              Text("Status", style: theme.textTheme.bodySmall),
+              Text("Status", style: theme.textTheme.bodyMedium),
               const SizedBox(height: 4),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -94,8 +100,8 @@ class DetailPinjamDialog extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  statusText,
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  _capitalize(statusText),
+                  style: theme.textTheme.headlineSmall?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
                   ),
@@ -105,11 +111,11 @@ class DetailPinjamDialog extends StatelessWidget {
               const SizedBox(height: 10),
 
               // ===== NAMA ALAT =====
-              Text("Nama Alat", style: theme.textTheme.bodySmall),
+              Text("Nama Alat", style: theme.textTheme.bodyMedium),
               const SizedBox(height: 4),
               Text(
                 (request['nama_alat'] ?? '-').toString(),
-                style: theme.textTheme.bodyMedium,
+                style: theme.textTheme.headlineSmall,
               ),
 
               const SizedBox(height: 10),
@@ -118,27 +124,27 @@ class DetailPinjamDialog extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Tanggal Pinjam", style: theme.textTheme.bodySmall),
+                  Text("Tanggal Pinjam", style: theme.textTheme.bodyMedium),
                   const SizedBox(height: 4),
                   Text(
                     _formatDate(request['tanggal_pinjam']),
-                    style: theme.textTheme.bodyMedium,
+                    style: theme.textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 8),
 
-                  Text("Tanggal Kembali", style: theme.textTheme.bodySmall),
+                  Text("Tanggal Kembali", style: theme.textTheme.bodyMedium),
                   const SizedBox(height: 4),
                   Text(
                     _formatDate(request['tanggal_kembali']),
-                    style: theme.textTheme.bodyMedium,
+                    style: theme.textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 8),
 
-                  Text("Dikembalikan", style: theme.textTheme.bodySmall),
+                  Text("Dikembalikan", style: theme.textTheme.bodyMedium),
                   const SizedBox(height: 4),
                   Text(
                     _formatDate(request['tanggal_pengembalian']),
-                    style: theme.textTheme.bodyMedium,
+                    style: theme.textTheme.headlineSmall,
                   ),
                 ],
               ),
@@ -152,12 +158,12 @@ class DetailPinjamDialog extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("Keterlambatan", style: theme.textTheme.bodySmall),
+                          Text("Keterlambatan", style: theme.textTheme.bodyMedium),
                           const SizedBox(height: 6),
                           Text(
-                            "$lateDays hari",
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
+                            "$lateDays Hari",
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ],
@@ -168,12 +174,12 @@ class DetailPinjamDialog extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("Kondisi Alat", style: theme.textTheme.bodySmall),
+                          Text("Kondisi Alat", style: theme.textTheme.bodyMedium),
                           const SizedBox(height: 6),
                           Text(
                             isBroken ? "Rusak" : "Baik",
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ],
@@ -185,18 +191,19 @@ class DetailPinjamDialog extends StatelessWidget {
               const SizedBox(height: 12),
 
               // ===== TUJUAN =====
-              Text("Tujuan Peminjaman", style: theme.textTheme.bodySmall),
+              Text("Tujuan Peminjaman", style: theme.textTheme.bodyMedium),
               const SizedBox(height: 4),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.08),
+                  color: AppTheme.textSecondary.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: theme.colorScheme.primary),
                 ),
                 child: Text(
                   (request['alasan'] ?? '-').toString(),
-                  style: theme.textTheme.bodyMedium,
+                  style: theme.textTheme.headlineSmall,
                 ),
               ),
 
@@ -214,7 +221,9 @@ class DetailPinjamDialog extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: const Text("Tutup"),
+                  child: Text(
+                    "Tutup", 
+                    style: theme.textTheme.bodyLarge),
                 ),
               ),
             ],

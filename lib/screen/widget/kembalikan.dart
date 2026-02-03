@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
-import '../models/loan_request.dart';
 import 'package:intl/intl.dart';
+import 'package:engine_rent_app/service/supabase_service.dart';
+
+import '../utils/theme.dart';
 
 class KembalikanDialog extends StatefulWidget {
-  final LoanRequest request;
-  final VoidCallback onReturn;
+  final Map<String, dynamic> request;
+  final VoidCallback onSuccess;
 
   const KembalikanDialog({
     super.key,
     required this.request,
-    required this.onReturn,
+    required this.onSuccess,
   });
 
   @override
@@ -18,17 +20,26 @@ class KembalikanDialog extends StatefulWidget {
 
 class _KembalikanDialogState extends State<KembalikanDialog> {
   bool isBroken = false;
+  bool loading = false;
+
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
   int _calculateLateDays(String dueDate) {
-    final today = DateTime.now();
     final due = DateTime.tryParse(dueDate);
     if (due == null) return 0;
 
-    final diff = today.difference(due).inDays;
+    final today = _dateOnly(DateTime.now());
+    final dueOnly = _dateOnly(due);
+
+    final diff = today.difference(dueOnly).inDays;
     return diff > 0 ? diff : 0;
   }
 
-  int _calculateFine(int lateDays) => lateDays * 10000;
+  int _getInt(dynamic v, {int fallback = 0}) {
+    if (v == null) return fallback;
+    if (v is int) return v;
+    return int.tryParse(v.toString()) ?? fallback;
+  }
 
   String _formatDate(String dateString) {
     final date = DateTime.tryParse(dateString);
@@ -44,14 +55,90 @@ class _KembalikanDialogState extends State<KembalikanDialog> {
     ).format(amount);
   }
 
+  int _calculateFineUI({
+    required int lateDays,
+    required int dendaPerHari,
+    required int biayaPerbaikan,
+    required bool rusak,
+  }) {
+    final dendaTerlambat = lateDays * dendaPerHari;
+    final dendaRusak = rusak ? biayaPerbaikan : 0;
+    return dendaTerlambat + dendaRusak;
+  }
+
+  Future<void> _confirmReturn() async {
+    try {
+      setState(() => loading = true);
+
+      final peminjamanId = widget.request['id'];
+      final tanggalKembali = (widget.request['tanggal_kembali'] ?? '').toString();
+
+      if (peminjamanId == null || tanggalKembali.isEmpty) {
+        throw Exception("Data tidak lengkap (id / tanggal_kembali null)");
+      }
+
+      final lateDays = _calculateLateDays(tanggalKembali);
+
+      // ambil dari alat
+      final dendaPerHari = _getInt(widget.request['denda_alat']);
+      final perbaikanAlat = _getInt(widget.request['perbaikan_alat']);
+
+      final totalDenda = _calculateFineUI(
+        lateDays: lateDays,
+        dendaPerHari: dendaPerHari,
+        biayaPerbaikan: perbaikanAlat,
+        rusak: isBroken,
+      );
+
+      await SupabaseService.updatePengembalianUI(
+        peminjamanId: int.parse(peminjamanId.toString()),
+        rusak: isBroken,
+        terlambat: lateDays,
+        denda: totalDenda,
+      );
+
+      widget.onSuccess();
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      debugPrint("❌ Return error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Gagal mengembalikan: $e")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    final lateDays = _calculateLateDays(widget.request.dueDate);
-    final fine = _calculateFine(lateDays);
+    final due = (widget.request['tanggal_kembali'] ?? '').toString();
+    final lateDays = _calculateLateDays(due);
+
+    // ambil dari alat
+    final dendaPerHari = _getInt(widget.request['denda_alat']);
+    final perbaikanAlat = _getInt(widget.request['perbaikan_alat']);
+
+    final fine = _calculateFineUI(
+      lateDays: lateDays,
+      dendaPerHari: dendaPerHari,
+      biayaPerbaikan: perbaikanAlat,
+      rusak: isBroken,
+    );
+
     final isLate = lateDays > 0;
+    final hasFine = fine > 0;
+
+    // warna highlight selaras theme
+    final infoBg = hasFine
+        ? scheme.error.withOpacity(0.08)
+        : scheme.primary.withOpacity(0.08);
+
+    final infoIconColor = hasFine ? scheme.error : scheme.primary;
 
     return Dialog(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -63,48 +150,67 @@ class _KembalikanDialogState extends State<KembalikanDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            /// ===== TITLE =====
             Center(
               child: Text(
                 "Konfirmasi Pengembalian",
                 style: theme.textTheme.headlineSmall,
               ),
             ),
-
             const SizedBox(height: 16),
 
-            /// ===== INFO ALAT =====
-            Text("Nama Alat", style: theme.textTheme.bodySmall),
+            Text("Nama Alat", style: theme.textTheme.bodyMedium),
             const SizedBox(height: 4),
             Text(
-              widget.request.equipmentName,
-              style: theme.textTheme.bodyMedium,
+              (widget.request['nama_alat'] ?? '-').toString(),
+              style: theme.textTheme.headlineSmall,
             ),
 
             const SizedBox(height: 12),
 
-            _infoRow("Tanggal Pinjam",
-                _formatDate(widget.request.borrowDate)),
-            _infoRow("Tanggal Kembali",
-                _formatDate(widget.request.dueDate)),
-            _infoRow("Dikembalikan",
-                _formatDate(DateTime.now().toString())),
             _infoRow(
-              "Keterlambatan",
-              "$lateDays hari",
-              valueColor: isLate ? scheme.error : null,
+              context,
+              "Tanggal Pinjam",
+              _formatDate((widget.request['tanggal_pinjam'] ?? '').toString()),
             ),
             _infoRow(
-              "Denda",
+              context,
+              "Tanggal Kembali",
+              _formatDate((widget.request['tanggal_kembali'] ?? '').toString()),
+            ),
+            _infoRow(
+              context,
+              "Dikembalikan",
+              _formatDate(DateTime.now().toIso8601String()),
+            ),
+            _infoRow(
+              context,
+              "Keterlambatan",
+              "$lateDays hari",
+              valueColor: isLate ? scheme.error : scheme.onSurface,
+            ),
+
+            const SizedBox(height: 6),
+
+            // detail perhitungan
+            _infoRow(context, "Denda / Hari", _formatCurrency(dendaPerHari)),
+            _infoRow(
+              context,
+              "Biaya Perbaikan",
+              _formatCurrency(isBroken ? perbaikanAlat : 0),
+            ),
+            _infoRow(
+              context,
+              "Total Denda",
               _formatCurrency(fine),
-              valueColor: isLate ? scheme.error : null,
+              valueColor: hasFine ? scheme.error : scheme.onSurface,
             ),
 
             const SizedBox(height: 16),
 
-            /// ===== KONDISI ALAT =====
-            Text("Apakah alat rusak?",
-                style: theme.textTheme.bodySmall),
+            Text(
+              "Apakah alat rusak?",
+              style: theme.textTheme.bodyMedium,
+            ),
             const SizedBox(height: 8),
 
             Row(
@@ -129,28 +235,28 @@ class _KembalikanDialogState extends State<KembalikanDialog> {
 
             const SizedBox(height: 16),
 
-            /// ===== ALERT STATUS =====
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isLate
-                    ? scheme.error.withOpacity(0.08)
-                    : Colors.green.withOpacity(0.08),
+                color: infoBg,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: infoIconColor.withOpacity(0.25),
+                ),
               ),
               child: Row(
                 children: [
                   Icon(
-                    isLate ? Icons.error : Icons.check_circle,
-                    color: isLate ? scheme.error : Colors.green,
+                    hasFine ? Icons.error : Icons.check_circle,
+                    color: infoIconColor,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      isLate
-                          ? "Terlambat $lateDays hari. Denda ${_formatCurrency(fine)} dikenakan."
-                          : "Pengembalian tepat waktu. Tidak ada denda.",
-                      style: theme.textTheme.bodySmall,
+                      hasFine
+                          ? "Denda ${_formatCurrency(fine)} akan dikenakan."
+                          : "Tidak ada denda.",
+                      style: theme.textTheme.bodyMedium
                     ),
                   ),
                 ],
@@ -159,29 +265,31 @@ class _KembalikanDialogState extends State<KembalikanDialog> {
 
             const SizedBox(height: 18),
 
-            /// ===== BUTTON =====
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {
-                      widget.onReturn();
-                      Navigator.pop(context);
-                    },
-                    child: const Text("Konfirmasi"),
+                    onPressed: loading ? null : _confirmReturn,
+                    child: loading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text("Konfirmasi"),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: loading ? null : () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
-                      padding:
-                          const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                       side: BorderSide(color: scheme.primary),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
+                      foregroundColor: scheme.primary,
                     ),
                     child: const Text("Batal"),
                   ),
@@ -194,21 +302,27 @@ class _KembalikanDialogState extends State<KembalikanDialog> {
     );
   }
 
-  Widget _infoRow(String label, String value,
-      {Color? valueColor}) {
+  Widget _infoRow(
+    BuildContext context,
+    String label,
+    String value, {
+    Color? valueColor,
+  }) {
+    final theme = Theme.of(context);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
           Expanded(
-            child: Text(label, style: const TextStyle(color: Colors.grey)),
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium,
+            ),
           ),
           Text(
             value,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: valueColor,
-            ),
+            style: theme.textTheme.headlineSmall
           ),
         ],
       ),
@@ -216,7 +330,6 @@ class _KembalikanDialogState extends State<KembalikanDialog> {
   }
 }
 
-/// ===== SELECT BOX (YA / TIDAK) =====
 class _SelectBox extends StatelessWidget {
   final String label;
   final bool selected;
@@ -233,6 +346,9 @@ class _SelectBox extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
+    final borderColor = selected ? scheme.primary : AppTheme.card;
+    final bgColor = selected ? scheme.primary.withOpacity(0.08) : Colors.transparent;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -240,21 +356,13 @@ class _SelectBox extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? scheme.primary : Colors.grey.shade300,
-            width: 1.5,
-          ),
-          color: selected
-              ? scheme.primary.withOpacity(0.08)
-              : Colors.transparent,
+          border: Border.all(color: borderColor, width: 1.5),
+          color: bgColor,
         ),
         child: Center(
           child: Text(
             label,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: selected ? scheme.primary : scheme.onSurface,
-            ),
+            style: theme.textTheme.headlineSmall
           ),
         ),
       ),

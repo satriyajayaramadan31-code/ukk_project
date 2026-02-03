@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/theme.dart';
 import 'package:intl/intl.dart';
 
 class TerimaPinjamDialog extends StatelessWidget {
@@ -18,15 +19,15 @@ class TerimaPinjamDialog extends StatelessWidget {
     final s = status.toLowerCase();
     switch (s) {
       case 'menunggu':
-        return Colors.amber;
+        return AppTheme.statusPending;
       case 'diproses':
-        return Colors.blue;
+        return AppTheme.statusConfirm;
       case 'dipinjam':
-        return Colors.green;
+        return AppTheme.statusBorrowed;
       case 'dikembalikan':
-        return Colors.teal;
+        return AppTheme.statusReturned;
       case 'ditolak':
-        return Colors.red;
+        return AppTheme.statusLate;
       default:
         return Colors.grey;
     }
@@ -92,17 +93,17 @@ class TerimaPinjamDialog extends StatelessWidget {
               const SizedBox(height: 12),
 
               // Peminjam
-              Text("Peminjam", style: theme.textTheme.bodySmall),
+              Text("Peminjam", style: theme.textTheme.bodyMedium),
               const SizedBox(height: 4),
               Text(
                 (request['username'] ?? '-').toString(),
-                style: theme.textTheme.bodyMedium,
+                style: theme.textTheme.headlineSmall,
               ),
 
               const SizedBox(height: 10),
 
               // Status (INI yang tadi hilang)
-              Text("Status", style: theme.textTheme.bodySmall),
+              Text("Status", style: theme.textTheme.bodyMedium),
               const SizedBox(height: 4),
               Container(
                 padding:
@@ -113,9 +114,8 @@ class TerimaPinjamDialog extends StatelessWidget {
                 ),
                 child: Text(
                   _statusText((request['status'] ?? '').toString()),
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  style: theme.textTheme.headlineSmall?.copyWith(
                     color: Colors.white,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -123,11 +123,11 @@ class TerimaPinjamDialog extends StatelessWidget {
               const SizedBox(height: 10),
 
               // Nama Alat
-              Text("Nama Alat", style: theme.textTheme.bodySmall),
+              Text("Nama Alat", style: theme.textTheme.bodyMedium),
               const SizedBox(height: 4),
               Text(
                 (request['nama_alat'] ?? '-').toString(),
-                style: theme.textTheme.bodyMedium,
+                style: theme.textTheme.headlineSmall,
               ),
 
               const SizedBox(height: 10),
@@ -144,7 +144,9 @@ class TerimaPinjamDialog extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           _formatDate(request['tanggal_pinjam']),
-                          style: theme.textTheme.bodyMedium,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
@@ -153,11 +155,13 @@ class TerimaPinjamDialog extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text("Jatuh Tempo", style: theme.textTheme.bodySmall),
+                        Text("Tanggal Kembali", style: theme.textTheme.bodySmall),
                         const SizedBox(height: 4),
                         Text(
                           _formatDate(request['tanggal_kembali']),
-                          style: theme.textTheme.bodyMedium,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
@@ -168,18 +172,19 @@ class TerimaPinjamDialog extends StatelessWidget {
               const SizedBox(height: 10),
 
               // Tujuan
-              Text("Tujuan Peminjaman", style: theme.textTheme.bodySmall),
+              Text("Tujuan Peminjaman", style: theme.textTheme.bodyMedium),
               const SizedBox(height: 4),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.08),
+                  color: AppTheme.textSecondary.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: theme.colorScheme.primary),
                 ),
                 child: Text(
                   (request['alasan'] ?? '-').toString(),
-                  style: theme.textTheme.bodyMedium,
+                  style: theme.textTheme.headlineSmall,
                   softWrap: true,
                 ),
               ),
@@ -194,7 +199,7 @@ class TerimaPinjamDialog extends StatelessWidget {
                       onPressed: onApprove,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: theme.colorScheme.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(6),
                         ),
@@ -210,7 +215,7 @@ class TerimaPinjamDialog extends StatelessWidget {
                         backgroundColor: Colors.transparent,
                         foregroundColor: theme.colorScheme.primary,
                         elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(6),
                           side: BorderSide(color: theme.colorScheme.primary),

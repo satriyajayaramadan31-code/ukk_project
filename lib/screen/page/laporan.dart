@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+
+import '../utils/theme.dart';
 import '../widget/app_bar.dart';
 import '../widget/side_menu.dart';
 import 'package:engine_rent_app/service/supabase_service.dart';
-import 'package:intl/intl.dart';
 
 /* ===================== MODEL ===================== */
 class ReportData {
@@ -57,7 +62,7 @@ class LaporanPage extends StatefulWidget {
 
 class _LaporanPageState extends State<LaporanPage> {
   String reportType = "equipment"; // equipment | user | category
-  String timePeriod = "month"; // week | month | quarter | year
+  String timePeriod = "month"; // week | month | year
   bool loading = true;
 
   List<Map<String, dynamic>> rawLoans = [];
@@ -118,10 +123,12 @@ class _LaporanPageState extends State<LaporanPage> {
         final s = (e['status'] ?? '').toString().toLowerCase();
         return s == 'dipinjam';
       }).length;
+
       completedLoans = rawLoans.where((e) {
         final s = (e['status'] ?? '').toString().toLowerCase();
         return s == 'dikembalikan';
       }).length;
+
       rejectedLoans = rawLoans.where((e) {
         final s = (e['status'] ?? '').toString().toLowerCase();
         return s == 'ditolak';
@@ -182,8 +189,10 @@ class _LaporanPageState extends State<LaporanPage> {
 
       map[alatId] = current.copyWith(
         totalLoans: current.totalLoans + 1,
-        activeLoans: current.activeLoans + ((status == 'dipinjam' || status == 'menunggu') ? 1 : 0),
-        completedLoans: current.completedLoans + ((status == 'dikembalikan' || status == 'selesai') ? 1 : 0),
+        activeLoans: current.activeLoans +
+            ((status == 'dipinjam' || status == 'menunggu') ? 1 : 0),
+        completedLoans: current.completedLoans +
+            ((status == 'dikembalikan' || status == 'selesai') ? 1 : 0),
         rejectedLoans: current.rejectedLoans + (status == 'ditolak' ? 1 : 0),
         overdueLoans: current.overdueLoans + terlambat,
         overdueCount: current.overdueCount + (terlambat > 0 ? 1 : 0),
@@ -199,16 +208,18 @@ class _LaporanPageState extends State<LaporanPage> {
       final userId = user?['id']?.toString() ?? 'unknown';
       final username = user?['username']?.toString() ?? 'Tidak diketahui';
 
-      map.putIfAbsent(userId, () => ReportData(
-        id: userId,
-        label: username,
-        totalLoans: 0,
-        activeLoans: 0,
-        completedLoans: 0,
-        rejectedLoans: 0,
-        overdueLoans: 0,
-        overdueCount: 0,
-      ));
+      map.putIfAbsent(
+          userId,
+          () => ReportData(
+                id: userId,
+                label: username,
+                totalLoans: 0,
+                activeLoans: 0,
+                completedLoans: 0,
+                rejectedLoans: 0,
+                overdueLoans: 0,
+                overdueCount: 0,
+              ));
 
       final current = map[userId]!;
       final status = (row['status'] ?? '').toString().toLowerCase();
@@ -217,14 +228,17 @@ class _LaporanPageState extends State<LaporanPage> {
 
       map[userId] = current.copyWith(
         totalLoans: current.totalLoans + 1,
-        activeLoans: current.activeLoans + ((status == 'dipinjam' || status == 'menunggu') ? 1 : 0),
-        completedLoans: current.completedLoans + ((status == 'dikembalikan' || status == 'selesai') ? 1 : 0),
+        activeLoans: current.activeLoans +
+            ((status == 'dipinjam' || status == 'menunggu') ? 1 : 0),
+        completedLoans: current.completedLoans +
+            ((status == 'dikembalikan' || status == 'selesai') ? 1 : 0),
         rejectedLoans: current.rejectedLoans + (status == 'ditolak' ? 1 : 0),
         overdueLoans: current.overdueLoans + terlambat,
         overdueCount: current.overdueCount + (terlambat > 0 ? 1 : 0),
       );
     }
-    return map.values.toList()..sort((a, b) => b.totalLoans.compareTo(a.totalLoans));
+    return map.values.toList()
+      ..sort((a, b) => b.totalLoans.compareTo(a.totalLoans));
   }
 
   List<ReportData> _aggregateByCategory(List<Map<String, dynamic>> loans) {
@@ -232,19 +246,22 @@ class _LaporanPageState extends State<LaporanPage> {
     for (final row in loans) {
       final alat = row['alat'];
       final kategoriObj = alat?['kategori_alat'];
-      final catId = kategoriObj?['id']?.toString() ?? alat?['kategori']?.toString() ?? 'unknown';
+      final catId =
+          kategoriObj?['id']?.toString() ?? alat?['kategori']?.toString() ?? 'unknown';
       final catName = kategoriObj?['kategori']?.toString() ?? 'Tidak diketahui';
 
-      map.putIfAbsent(catId, () => ReportData(
-        id: catId,
-        label: catName,
-        totalLoans: 0,
-        activeLoans: 0,
-        completedLoans: 0,
-        rejectedLoans: 0,
-        overdueLoans: 0,
-        overdueCount: 0,
-      ));
+      map.putIfAbsent(
+          catId,
+          () => ReportData(
+                id: catId,
+                label: catName,
+                totalLoans: 0,
+                activeLoans: 0,
+                completedLoans: 0,
+                rejectedLoans: 0,
+                overdueLoans: 0,
+                overdueCount: 0,
+              ));
 
       final current = map[catId]!;
       final status = (row['status'] ?? '').toString().toLowerCase();
@@ -253,20 +270,78 @@ class _LaporanPageState extends State<LaporanPage> {
 
       map[catId] = current.copyWith(
         totalLoans: current.totalLoans + 1,
-        activeLoans: current.activeLoans + ((status == 'dipinjam' || status == 'menunggu') ? 1 : 0),
-        completedLoans: current.completedLoans + ((status == 'dikembalikan' || status == 'selesai') ? 1 : 0),
+        activeLoans: current.activeLoans +
+            ((status == 'dipinjam' || status == 'menunggu') ? 1 : 0),
+        completedLoans: current.completedLoans +
+            ((status == 'dikembalikan' || status == 'selesai') ? 1 : 0),
         rejectedLoans: current.rejectedLoans + (status == 'ditolak' ? 1 : 0),
         overdueLoans: current.overdueLoans + terlambat,
         overdueCount: current.overdueCount + (terlambat > 0 ? 1 : 0),
       );
     }
-    return map.values.toList()..sort((a, b) => b.totalLoans.compareTo(a.totalLoans));
+    return map.values.toList()
+      ..sort((a, b) => b.totalLoans.compareTo(a.totalLoans));
   }
 
-  void handleExport() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Laporan akan diunduh sebagai file Excel/PDF")),
+  /* ===================== EXPORT PDF ===================== */
+  Future<void> handleExport() async {
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        build: (context) => [
+          pw.Header(level: 0, text: "Laporan Peminjaman Alat"),
+          pw.Text("Periode: $timePeriod"),
+          pw.SizedBox(height: 10),
+
+          pw.Table.fromTextArray(
+            headers: ["Total", "Aktif", "Selesai", "Ditolak", "Terlambat", "Total Denda"],
+            data: [
+              [
+                totalLoans.toString(),
+                activeLoans.toString(),
+                completedLoans.toString(),
+                rejectedLoans.toString(),
+                overdueLoans.toString(),
+                formatCurrency(totalFines),
+              ]
+            ],
+          ),
+          pw.SizedBox(height: 10),
+
+          pw.Text("Laporan Utama"),
+          pw.Table.fromTextArray(
+            headers: [_mainTitle(), "Total", "Aktif", "Selesai", "Ditolak", "Terlambat"],
+            data: mainReports
+                .map((r) => [
+                      r.label,
+                      r.totalLoans.toString(),
+                      r.activeLoans.toString(),
+                      r.completedLoans.toString(),
+                      r.rejectedLoans.toString(),
+                      r.overdueCount.toString()
+                    ])
+                .toList(),
+          ),
+          pw.SizedBox(height: 10),
+
+          pw.Text("Alat Paling Populer"),
+          pw.Table.fromTextArray(
+            headers: ["Nama Alat", "Total Pinjam"],
+            data: popularEquipment.map((r) => [r.label, r.totalLoans.toString()]).toList(),
+          ),
+          pw.SizedBox(height: 10),
+
+          pw.Text("Perlu Perhatian"),
+          pw.Table.fromTextArray(
+            headers: ["Nama Alat", "Terlambat"],
+            data: needAttention.map((r) => [r.label, r.overdueCount.toString()]).toList(),
+          ),
+        ],
+      ),
     );
+
+    await Printing.layoutPdf(onLayout: (format) => pdf.save());
   }
 
   String _mainTitle() {
@@ -277,6 +352,8 @@ class _LaporanPageState extends State<LaporanPage> {
 
   @override
   Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Laporan'),
       drawer: const SideMenu(),
@@ -288,13 +365,16 @@ class _LaporanPageState extends State<LaporanPage> {
             children: [
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text("Laporan", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                        SizedBox(height: 4),
-                        Text("Laporan dan statistik peminjaman alat", style: TextStyle(color: Colors.grey)),
+                        Text("Laporan", style: text.headlineLarge),
+                        const SizedBox(height: 4),
+                        Text(
+                          "Laporan dan statistik peminjaman alat",
+                          style: text.bodyMedium,
+                        ),
                       ],
                     ),
                   ),
@@ -302,6 +382,13 @@ class _LaporanPageState extends State<LaporanPage> {
                     onPressed: handleExport,
                     icon: const Icon(Icons.download),
                     label: const Text("Unduh"),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.all(10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      textStyle: text.bodyLarge,
+                    ),
                   ),
                 ],
               ),
@@ -309,15 +396,19 @@ class _LaporanPageState extends State<LaporanPage> {
 
               // Filter
               Card(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: Padding(
                   padding: const EdgeInsets.all(14),
                   child: Row(
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
+                          style: text.bodyMedium,
                           initialValue: reportType,
-                          decoration: const InputDecoration(labelText: "Jenis Laporan", border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: "Jenis Laporan",
+                            
+                            border: OutlineInputBorder(),
+                          ),
                           items: const [
                             DropdownMenuItem(value: "equipment", child: Text("Alat")),
                             DropdownMenuItem(value: "user", child: Text("Pengguna")),
@@ -333,8 +424,12 @@ class _LaporanPageState extends State<LaporanPage> {
                       const SizedBox(width: 14),
                       Expanded(
                         child: DropdownButtonFormField<String>(
+                          style: text.bodyMedium,
                           initialValue: timePeriod,
-                          decoration: const InputDecoration(labelText: "Periode", border: OutlineInputBorder()),
+                          decoration: const InputDecoration(
+                            labelText: "Periode",
+                            border: OutlineInputBorder(),
+                          ),
                           items: const [
                             DropdownMenuItem(value: "week", child: Text("Minggu Ini")),
                             DropdownMenuItem(value: "month", child: Text("Bulan Ini")),
@@ -355,14 +450,21 @@ class _LaporanPageState extends State<LaporanPage> {
 
               // Summary
               if (loading)
-                const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
               else
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final crossAxisCount = constraints.maxWidth > 700 ? 3 : 2;
                     final spacing = 14.0;
                     final width = constraints.maxWidth;
-                    double span(int s) => ((width - spacing * (crossAxisCount - 1)) / crossAxisCount * s) + spacing * (s - 1);
+                    double span(int s) =>
+                        ((width - spacing * (crossAxisCount - 1)) / crossAxisCount * s) +
+                        spacing * (s - 1);
 
                     return Wrap(
                       spacing: spacing,
@@ -372,7 +474,11 @@ class _LaporanPageState extends State<LaporanPage> {
                         _box(span(1), "Sedang Dipinjam", activeLoans.toString()),
                         _box(span(1), "Dikembalikan", completedLoans.toString()),
                         _box(span(1), "Terlambat", overdueLoans.toString()),
-                        _box(span(crossAxisCount >= 3 ? 2 : crossAxisCount), "Total Denda", formatCurrency(totalFines)),
+                        _box(
+                          span(crossAxisCount >= 3 ? 2 : crossAxisCount),
+                          "Total Denda",
+                          formatCurrency(totalFines),
+                        ),
                       ],
                     );
                   },
@@ -385,9 +491,19 @@ class _LaporanPageState extends State<LaporanPage> {
               const SizedBox(height: 16),
 
               // Insight Tables
-              _InsightTable(title: "Alat Paling Populer", columns: const ["Nama Alat", "Total Pinjam"], rows: popularEquipment, isPopular: true),
+              _InsightTable(
+                title: "Alat Paling Populer",
+                columns: const ["Nama Alat", "Total Pinjam"],
+                rows: popularEquipment,
+                isPopular: true,
+              ),
               const SizedBox(height: 14),
-              _InsightTable(title: "Perlu Perhatian", columns: const ["Nama Alat", "Terlambat"], rows: needAttention, isPopular: false),
+              _InsightTable(
+                title: "Perlu Perhatian",
+                columns: const ["Nama Alat", "Terlambat"],
+                rows: needAttention,
+                isPopular: false,
+              ),
             ],
           ),
         ),
@@ -395,7 +511,8 @@ class _LaporanPageState extends State<LaporanPage> {
     );
   }
 
-  Widget _box(double width, String t, String v) => SizedBox(width: width, child: _StatCard(title: t, value: v));
+  Widget _box(double width, String t, String v) =>
+      SizedBox(width: width, child: _StatCard(title: t, value: v));
 }
 
 /* ===================== TABLE UTAMA ===================== */
@@ -406,13 +523,16 @@ class _MainTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: DataTable(
+            headingTextStyle: text.bodyMedium,
+            dataTextStyle: text.bodyMedium,
             columnSpacing: 24,
             columns: [
               DataColumn(label: Text(titleCol)),
@@ -422,14 +542,16 @@ class _MainTable extends StatelessWidget {
               const DataColumn(label: Text("Ditolak")),
               const DataColumn(label: Text("Terlambat")),
             ],
-            rows: data.map((r) => DataRow(cells: [
-              DataCell(Text(r.label)),
-              DataCell(Text(r.totalLoans.toString())),
-              DataCell(Text(r.activeLoans.toString())),
-              DataCell(Text(r.completedLoans.toString())),
-              DataCell(Text(r.rejectedLoans.toString())),
-              DataCell(Text(r.overdueCount.toString())),
-            ])).toList(),
+            rows: data
+                .map((r) => DataRow(cells: [
+                      DataCell(Text(r.label)),
+                      DataCell(Text(r.totalLoans.toString())),
+                      DataCell(Text(r.activeLoans.toString())),
+                      DataCell(Text(r.completedLoans.toString())),
+                      DataCell(Text(r.rejectedLoans.toString())),
+                      DataCell(Text(r.overdueCount.toString())),
+                    ]))
+                .toList(),
           ),
         ),
       ),
@@ -445,16 +567,23 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title),
+            Text(
+              title,
+              style: text.bodyMedium,
+            ),
             const SizedBox(height: 8),
-            Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              value,
+              style: text.headlineMedium,
+            ),
           ],
         ),
       ),
@@ -468,28 +597,41 @@ class _InsightTable extends StatelessWidget {
   final List<String> columns;
   final List<ReportData> rows;
   final bool isPopular;
-  const _InsightTable({super.key, required this.title, required this.columns, required this.rows, required this.isPopular});
+  const _InsightTable({
+    super.key,
+    required this.title,
+    required this.columns,
+    required this.rows,
+    required this.isPopular,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(title, style: text.headlineSmall),
             const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
+                headingTextStyle: text.bodyMedium,
+                dataTextStyle: text.bodyMedium,
                 columnSpacing: 24,
                 columns: columns.map((c) => DataColumn(label: Text(c))).toList(),
-                rows: rows.map((r) => DataRow(cells: [
-                  DataCell(Text(r.label)),
-                  DataCell(Text(isPopular ? r.totalLoans.toString() : r.overdueCount.toString())),
-                ])).toList(),
+                rows: rows
+                    .map((r) => DataRow(cells: [
+                          DataCell(Text(r.label)),
+                          DataCell(
+                            Text(isPopular ? r.totalLoans.toString() : r.overdueCount.toString()),
+                          ),
+                        ]))
+                    .toList(),
               ),
             ),
           ],

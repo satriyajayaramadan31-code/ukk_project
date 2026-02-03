@@ -722,14 +722,15 @@ class SupabaseService {
   }
 
   // ================= PEMINJAMAN =================
-
   static Future<List<Map<String, dynamic>>> getPeminjaman({
     required String role,
   }) async {
     try {
+      final normalizedRole = role.trim().toLowerCase();
       final userId = await getUserId();
 
-      final selectQuery = _client.from('peminjaman').select('''
+      // base query
+      PostgrestFilterBuilder q = _client.from('peminjaman').select('''
         id,
         status,
         tanggal_pinjam,
@@ -739,19 +740,25 @@ class SupabaseService {
         terlambat,
         rusak,
         denda,
+        created_at,
         user:user ( id, username ),
-        alat:alat ( id, nama_alat )
+        alat:alat ( id, nama_alat, denda, perbaikan )
       ''');
 
-      final res = (role == 'Peminjam' && userId != null)
-          ? await selectQuery
-                .eq('user', userId)
-                .order('created_at', ascending: false)
-          : await selectQuery.order('created_at', ascending: false);
+      // ✅ filter hanya jika role peminjam
+      if (normalizedRole == 'peminjam') {
+        if (userId == null) return [];
+        q = q.eq('user', userId);
+      }
+
+      final res = await q.order('created_at', ascending: false);
 
       final list = List<Map<String, dynamic>>.from(res);
 
       return list.map((e) {
+        final alat = e['alat'] as Map<String, dynamic>?;
+        final user = e['user'] as Map<String, dynamic>?;
+
         return {
           'id': e['id'],
           'status': e['status'],
@@ -761,11 +768,19 @@ class SupabaseService {
           'alasan': e['alasan'],
           'terlambat': e['terlambat'] ?? 0,
           'rusak': e['rusak'] ?? false,
+
+          // denda tersimpan di peminjaman (kalau ada)
           'denda': e['denda'] ?? 0,
-          'user_id': e['user']?['id'],
-          'username': e['user']?['username'],
-          'alat_id': e['alat']?['id'],
-          'nama_alat': e['alat']?['nama_alat'],
+
+          'user_id': user?['id'],
+          'username': user?['username'],
+
+          'alat_id': alat?['id'],
+          'nama_alat': alat?['nama_alat'],
+
+          // buat hitung denda UI
+          'denda_alat': alat?['denda'] ?? 0,
+          'perbaikan_alat': alat?['perbaikan'] ?? 0,
         };
       }).toList();
     } catch (e) {
@@ -816,6 +831,7 @@ class SupabaseService {
     String? tanggalPengembalian,
     required String alasan,
     required String status,
+    String? role,
   }) async {
     final inserted = await _client
         .from('peminjaman')
@@ -846,9 +862,15 @@ class SupabaseService {
         inserted['user']?['username']?.toString() ?? 'User#$userId';
 
     // ✅ log
-    await insertLog(
-      description: 'Menambah peminjaman $namaAlat milik $namaPeminjam',
-    );
+    final normalizedRole = (role ?? '').toLowerCase().trim();
+    if (normalizedRole == 'admin') {
+      await insertLog(
+        description: 'Menambah peminjaman $namaAlat milik $namaPeminjam',
+      );
+    } else {
+      await insertLog(description: '$namaPeminjam mengajukan peminjaman alat $namaAlat',
+      );
+    }
 
     return {
       'id': inserted['id'],
@@ -874,7 +896,22 @@ class SupabaseService {
     required String alasan,
     required String status,
     bool? rusak,
+    String? role,
   }) async {
+    // ==========================
+    // 1) Ambil status lama
+    // ==========================
+    final oldRow = await _client
+        .from('peminjaman')
+        .select('status')
+        .eq('id', id)
+        .single();
+
+    final oldStatus = (oldRow['status'] ?? '').toString().toLowerCase().trim();
+
+    // ==========================
+    // 2) Update
+    // ==========================
     final updated = await _client
         .from('peminjaman')
         .update({
@@ -889,26 +926,58 @@ class SupabaseService {
         })
         .eq('id', id)
         .select('''
-      id,
-      status,
-      tanggal_pinjam,
-      tanggal_kembali,
-      tanggal_pengembalian,
-      alasan,
-      user:user ( id, username ),
-      alat:alat ( id, nama_alat )
-    ''')
+          id,
+          status,
+          tanggal_pinjam,
+          tanggal_kembali,
+          tanggal_pengembalian,
+          alasan,
+          user:user ( id, username ),
+          alat:alat ( id, nama_alat )
+        ''')
         .single();
 
-    final namaAlat =
-        updated['alat']?['nama_alat']?.toString() ?? 'Alat#$alatId';
+    // ==========================
+    // 3) Normalisasi data
+    // ==========================
+    final namaAlat = updated['alat']?['nama_alat']?.toString() ?? 'Alat#$alatId';
     final namaPeminjam =
         updated['user']?['username']?.toString() ?? 'User#$userId';
 
-    // ✅ log
-    await insertLog(
-      description: 'Mengedit peminjaman $namaAlat milik $namaPeminjam',
-    );
+    final newStatus = (updated['status'] ?? '').toString().toLowerCase().trim();
+    final normalizedRole = (role ?? '').toLowerCase().trim();
+
+    // ==========================
+    // 4) LOG berdasarkan transisi status
+    // ==========================
+
+    // Admin edit biasa
+    if (normalizedRole == 'admin') {
+      await insertLog(
+        description: 'Mengedit peminjaman $namaAlat milik $namaPeminjam',
+      );
+    }
+
+    // Menunggu -> Dipinjam (Menyetujui peminjaman)
+    if (oldStatus == 'menunggu' && newStatus == 'dipinjam') {
+      await insertLog(
+        description: 'Menyetujui peminjaman $namaAlat untuk $namaPeminjam',
+      );
+    }
+
+    // Diproses -> Dikembalikan (Menyetujui pengembalian)
+    if (oldStatus == 'diproses' && newStatus == 'dikembalikan') {
+      await insertLog(
+        description: 'Menyetujui pengembalian $namaAlat dari $namaPeminjam',
+      );
+    }
+
+    // Diproses -> Dipinjam (Menolak pengembalian)
+    if (oldStatus == 'diproses' && newStatus == 'dipinjam') {
+      await insertLog(
+        description: 'Menolak pengembalian $namaAlat dari $namaPeminjam',
+      );
+    }    
 
     return {
       'id': updated['id'],
@@ -920,7 +989,7 @@ class SupabaseService {
       'user_id': updated['user']?['id'],
       'username': updated['user']?['username'],
       'alat_id': updated['alat']?['id'],
-      'nama_alat': updated['alat']?['nama_alat']
+      'nama_alat': updated['alat']?['nama_alat'],
     };
   }
 
@@ -962,36 +1031,36 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(res);
   }
 
-// ================= LAPORAN =================
-static DateTime _startDateFromPeriod(String timePeriod) {
-  final now = DateTime.now();
-  DateTime start;
+  // ================= LAPORAN =================
+  static DateTime _startDateFromPeriod(String timePeriod) {
+    final now = DateTime.now();
+    DateTime start;
 
-  switch (timePeriod) {
-    case 'week':
-      start = now.subtract(Duration(days: now.weekday - 1));
-      break;
-    case 'month':
-      start = DateTime(now.year, now.month, 1);
-      break;
-    case 'year':
-      start = DateTime(now.year, 1, 1);
-      break;
-    default:
-      start = DateTime(now.year, now.month, 1);
+    switch (timePeriod) {
+      case 'week':
+        start = now.subtract(Duration(days: now.weekday - 1));
+        break;
+      case 'month':
+        start = DateTime(now.year, now.month, 1);
+        break;
+      case 'year':
+        start = DateTime(now.year, 1, 1);
+        break;
+      default:
+        start = DateTime(now.year, now.month, 1);
+    }
+    return DateTime(start.year, start.month, start.day);
   }
-  return DateTime(start.year, start.month, start.day);
-}
 
-static Future<List<Map<String, dynamic>>> getLaporanRaw({
-  required String timePeriod,
-}) async {
-  try {
-    final start = _startDateFromPeriod(timePeriod);
-    final role = await getRole();
-    final userId = await getUserId();
+  static Future<List<Map<String, dynamic>>> getLaporanRaw({
+    required String timePeriod,
+  }) async {
+    try {
+      final start = _startDateFromPeriod(timePeriod);
+      final role = await getRole();
+      final userId = await getUserId();
 
-    PostgrestFilterBuilder q = _client.from('peminjaman').select('''
+      PostgrestFilterBuilder q = _client.from('peminjaman').select('''
       id,
       status,
       tanggal_pinjam,
@@ -1004,19 +1073,84 @@ static Future<List<Map<String, dynamic>>> getLaporanRaw({
       created_at
     ''');
 
-    q = q.gte('created_at', start.toIso8601String());
+      q = q.gte('created_at', start.toIso8601String());
 
-    if ((role ?? '').toLowerCase() == 'peminjam' && userId != null) {
-      q = q.eq('user', userId);
+      if ((role ?? '').toLowerCase() == 'peminjam' && userId != null) {
+        q = q.eq('user', userId);
+      }
+
+      final res = await q.order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(res);
+    } catch (e) {
+      debugPrint('❌ GET LAPORAN RAW ERROR: $e');
+      return [];
     }
-
-    final res = await q.order('created_at', ascending: false);
-    return List<Map<String, dynamic>>.from(res);
-  } catch (e) {
-    debugPrint('❌ GET LAPORAN RAW ERROR: $e');
-    return [];
   }
-}
+
+  // ================= PENGEMBALIAN =================
+  static Future<void> kembalikanPeminjaman({
+    required int peminjamanId,
+    required int alatId,
+    required String tanggalKembali, // dari DB (tanggal_kembali)
+    required bool rusak,
+  }) async {
+    try {
+      final now = DateTime.now();
+
+      // ambil nama alat untuk log
+      final alat = await _client
+          .from('alat')
+          .select('nama_alat')
+          .eq('id', alatId)
+          .maybeSingle();
+
+      final namaAlat = alat?['nama_alat']?.toString() ?? 'Alat#$alatId';
+
+      // update peminjaman
+      await _client
+          .from('peminjaman')
+          .update({
+            'status': 'dikembalikan',
+            'tanggal_pengembalian': now.toIso8601String(),
+            'rusak': rusak,
+          })
+          .eq('id', peminjamanId);
+
+      // update alat -> tersedia lagi
+      await _client
+          .from('alat')
+          .update({'status': 'Tersedia'})
+          .eq('id', alatId);
+
+      // log (pakai nama alat)
+      await insertLog(description: 'Mengembalikan alat $namaAlat');
+
+      debugPrint('✅ Pengembalian berhasil id=$peminjamanId');
+    } catch (e) {
+      debugPrint('❌ kembalikanPeminjaman ERROR: $e');
+      rethrow;
+    }
+  }
+
+  static Future<void> updatePengembalianUI({
+    required int peminjamanId,
+    required bool rusak,
+    required int terlambat,
+    required int denda,
+  }) async {
+    final supabase = Supabase.instance.client;
+
+    await supabase
+        .from('peminjaman')
+        .update({
+          'status': 'diproses',
+          'rusak': rusak,
+          'terlambat': terlambat,
+          'denda': denda,
+          'tanggal_pengembalian': DateTime.now().toIso8601String(),
+        })
+        .eq('id', peminjamanId);
+  }
 
   // ================= LOGOUT =================
   static Future<void> logout() async {

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../page/alat.dart';
+import 'package:engine_rent_app/service/supabase_service.dart';
 
 class BorrowRequest extends StatefulWidget {
   final Equipment equipment;
@@ -21,6 +23,8 @@ class _BorrowRequestState extends State<BorrowRequest> {
   DateTime? borrowDate;
   DateTime? returnDate;
   String purpose = "";
+
+  bool isSubmitting = false;
 
   final TextEditingController borrowController = TextEditingController();
   final TextEditingController returnController = TextEditingController();
@@ -48,8 +52,7 @@ class _BorrowRequestState extends State<BorrowRequest> {
       setState(() {
         if (isBorrow) {
           borrowDate = picked;
-          borrowController.text =
-              "${picked.day}/${picked.month}/${picked.year}";
+          borrowController.text = "${picked.day}/${picked.month}/${picked.year}";
         } else {
           returnDate = picked;
           returnController.text =
@@ -57,6 +60,11 @@ class _BorrowRequestState extends State<BorrowRequest> {
         }
       });
     }
+  }
+
+  String _toSqlDate(DateTime dt) {
+    // format: YYYY-MM-DD
+    return DateFormat('yyyy-MM-dd').format(dt);
   }
 
   void _showPopup({
@@ -116,13 +124,78 @@ class _BorrowRequestState extends State<BorrowRequest> {
     });
   }
 
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (borrowDate == null || returnDate == null) return;
+
+    // validasi tanggal
+    if (returnDate!.isBefore(borrowDate!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Tanggal kembali harus setelah pinjam")),
+      );
+      return;
+    }
+
+    setState(() => isSubmitting = true);
+
+    try {
+      final userId = await SupabaseService.getUserId();
+      if (userId == null) {
+        throw Exception("User belum login");
+      }
+
+      final alatId = int.tryParse(widget.equipment.id);
+      if (alatId == null) {
+        throw Exception("ID alat tidak valid");
+      }
+
+      await SupabaseService.addPeminjaman(
+        userId: userId,
+        alatId: alatId,
+        tanggalPinjam: _toSqlDate(borrowDate!),
+        tanggalKembali: _toSqlDate(returnDate!),
+        tanggalPengembalian: null,
+        alasan: purpose,
+        status: "menunggu", // sesuai sistem kamu
+      );
+
+      if (!mounted) return;
+
+      // tutup dialog form
+      Navigator.pop(context);
+
+      // popup sukses
+      _showPopup(
+        icon: Icons.check_circle,
+        text: "Permintaan Berhasil\nDikirim",
+        onDone: () {
+          widget.onSubmit(); // refresh halaman alat
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Gagal mengirim permintaan: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => isSubmitting = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    borrowController.dispose();
+    returnController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: theme.colorScheme.background,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24),
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -138,7 +211,6 @@ class _BorrowRequestState extends State<BorrowRequest> {
                     style: theme.textTheme.headlineSmall,
                   ),
                 ),
-
                 const SizedBox(height: 16),
 
                 ListTile(
@@ -148,6 +220,8 @@ class _BorrowRequestState extends State<BorrowRequest> {
                     width: 60,
                     height: 60,
                     fit: BoxFit.cover,
+                    errorBuilder: (context, error, stack) =>
+                        const Icon(Icons.broken_image),
                   ),
                   title: Text(widget.equipment.name),
                   subtitle: Text(widget.equipment.category),
@@ -206,7 +280,7 @@ class _BorrowRequestState extends State<BorrowRequest> {
                   ),
                   onChanged: (value) => purpose = value,
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
+                    if (value == null || value.trim().isEmpty) {
                       return "Tujuan wajib diisi";
                     }
                     return null;
@@ -219,22 +293,7 @@ class _BorrowRequestState extends State<BorrowRequest> {
                   children: [
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
-                          if (_formKey.currentState!.validate()) {
-
-                            // TUTUP DIALOG PERTAMA
-                            Navigator.pop(context);
-
-                            // TAMPILKAN POPUP SUCCESS
-                            _showPopup(
-                              icon: Icons.check_circle,
-                              text: "Permintaan Berhasil\nDikirim",
-                              onDone: () {
-                                widget.onSubmit();
-                              },
-                            );
-                          }
-                        },
+                        onPressed: isSubmitting ? null : _submit,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: theme.colorScheme.primary,
                           foregroundColor: Colors.white,
@@ -243,7 +302,16 @@ class _BorrowRequestState extends State<BorrowRequest> {
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        child: const Text("Ajukan"),
+                        child: isSubmitting
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text("Ajukan"),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -259,7 +327,8 @@ class _BorrowRequestState extends State<BorrowRequest> {
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed:
+                            isSubmitting ? null : () => Navigator.pop(context),
                         child: Text(
                           'Batal',
                           style: theme.textTheme.bodyMedium!.copyWith(
