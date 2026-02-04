@@ -327,7 +327,7 @@ class _LaporanPageState extends State<LaporanPage> {
           pw.SizedBox(height: 10),
 
           pw.Text("Laporan Utama"),
-          pw.Table.fromTextArray(
+          pw.TableHelper.fromTextArray(
             headers: [
               _mainTitle(),
               "Total",
@@ -352,7 +352,7 @@ class _LaporanPageState extends State<LaporanPage> {
           pw.SizedBox(height: 10),
 
           pw.Text("Alat Paling Populer"),
-          pw.Table.fromTextArray(
+          pw.TableHelper.fromTextArray(
             headers: ["Nama Alat", "Total Pinjam"],
             data: popularEquipment
                 .map((r) => [r.label, r.totalLoans.toString()])
@@ -361,7 +361,7 @@ class _LaporanPageState extends State<LaporanPage> {
           pw.SizedBox(height: 10),
 
           pw.Text("Perlu Perhatian"),
-          pw.Table.fromTextArray(
+          pw.TableHelper.fromTextArray(
             headers: ["Nama Alat", "Terlambat"],
             data: needAttention
                 .map((r) => [r.label, r.overdueCount.toString()])
@@ -584,7 +584,7 @@ class _LaporanPageState extends State<LaporanPage> {
 class _MainTable extends StatelessWidget {
   final List<ReportData> data;
   final String titleCol;
-  const _MainTable({super.key, required this.data, required this.titleCol});
+  const _MainTable({required this.data, required this.titleCol});
 
   @override
   Widget build(BuildContext context) {
@@ -636,7 +636,7 @@ class _MainTable extends StatelessWidget {
 class _StatCard extends StatelessWidget {
   final String title;
   final String value;
-  const _StatCard({super.key, required this.title, required this.value});
+  const _StatCard({required this.title, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -665,7 +665,6 @@ class _InsightTable extends StatelessWidget {
   final List<ReportData> rows;
   final bool isPopular;
   const _InsightTable({
-    super.key,
     required this.title,
     required this.columns,
     required this.rows,

@@ -1152,6 +1152,183 @@ class SupabaseService {
         .eq('id', peminjamanId);
   }
 
+  // =============== Pemanjangan ==============
+
+    static Future<List<Map<String, dynamic>>> fetchPemanjanganLoans() async {
+    final role = await getRole();
+    final userId = await getUserId();
+
+    if (role == null || userId == null) return [];
+    if (role.toLowerCase().trim() != 'peminjam') return [];
+
+    final res = await _client.from('peminjaman').select('''
+        id,
+        status,
+        tanggal_pinjam,
+        tanggal_kembali,
+        tanggal_pengembalian,
+        tambah,
+        pengulangan,
+        minta,
+        created_at,
+        alat:alat ( id, nama_alat )
+      ''')
+        .eq('user', userId)
+        .inFilter('status', ['dipinjam', 'menunggu', 'diproses'])
+        .order('created_at', ascending: false);
+
+    final list = List<Map<String, dynamic>>.from(res);
+
+    final filtered = list.where((e) {
+      final status = (e['status'] ?? '').toString().toLowerCase().trim();
+      final minta = (e['minta'] ?? false) == true;
+      return status == 'dipinjam' || minta;
+    }).toList();
+
+    filtered.sort((a, b) {
+      final am = (a['minta'] ?? false) == true;
+      final bm = (b['minta'] ?? false) == true;
+      if (am == bm) return 0;
+      return am ? -1 : 1;
+    });
+
+    return filtered;
+  }
+
+  // request perpanjangan
+  static Future<void> requestExtension({
+    required dynamic peminjamanId,
+    required int tambahHari,
+  }) async {
+    await _client.from('peminjaman').update({
+      'tambah': tambahHari,
+      'minta': true,
+    }).eq('id', peminjamanId);
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchPemanjanganRequestsAdmin() async {
+    try {
+      final role = await getRole();
+      if (role == null || role.toLowerCase().trim() != 'petugas') return [];
+
+      final res = await _client.from('peminjaman').select('''
+        id,
+        status,
+        tanggal_pinjam,
+        tanggal_kembali,
+        tanggal_pengembalian,
+        tambah,
+        pengulangan,
+        minta,
+        created_at,
+        user:user ( id, username ),
+        alat:alat ( id, nama_alat )
+      ''')
+          .eq('minta', true)
+          .order('created_at', ascending: false);
+
+      return List<Map<String, dynamic>>.from(res);
+    } catch (e) {
+      debugPrint('❌ fetchPemanjanganRequests ERROR: $e');
+      return [];
+    }
+  }
+
+  /// ADMIN: terima permintaan pemanjangan
+  /// - tanggal_kembali = tanggal_kembali + tambah hari
+  /// - pengulangan + 1
+  /// - minta = false
+  /// - tambah = 0
+  static Future<void> approveExtension({
+    required dynamic peminjamanId,
+  }) async {
+    try {
+      // ambil data dulu
+      final row = await _client.from('peminjaman').select('''
+        id,
+        tanggal_kembali,
+        tambah,
+        pengulangan,
+        user:user ( username ),
+        alat:alat ( nama_alat )
+      ''')
+          .eq('id', peminjamanId)
+          .single();
+
+      final String tanggalKembaliStr = (row['tanggal_kembali'] ?? '').toString();
+      final int tambahHari = (row['tambah'] ?? 0) is int
+          ? (row['tambah'] ?? 0)
+          : int.tryParse(row['tambah'].toString()) ?? 0;
+
+      final int pengulangan = (row['pengulangan'] ?? 0) is int
+          ? (row['pengulangan'] ?? 0)
+          : int.tryParse(row['pengulangan'].toString()) ?? 0;
+
+      final namaAlat = row['alat']?['nama_alat']?.toString() ?? 'Alat';
+      final namaPeminjam = row['user']?['username']?.toString() ?? 'User';
+
+      if (tanggalKembaliStr.isEmpty) {
+        throw Exception('tanggal_kembali kosong');
+      }
+
+      final oldDate = DateTime.parse(tanggalKembaliStr);
+      final newDate = oldDate.add(Duration(days: tambahHari));
+
+      await _client.from('peminjaman').update({
+        'tanggal_kembali': newDate.toIso8601String(),
+        'pengulangan': pengulangan + 1,
+        'minta': false,
+        'tambah': 0,
+      }).eq('id', peminjamanId);
+
+      // log
+      await insertLog(
+        description: 'Menerima pemanjangan $namaAlat milik $namaPeminjam (+$tambahHari hari)',
+      );
+
+      debugPrint('✅ approveExtension sukses id=$peminjamanId');
+    } catch (e) {
+      debugPrint('❌ approveExtension ERROR: $e');
+      rethrow;
+    }
+  }
+
+  /// ADMIN: tolak permintaan pemanjangan
+  /// - minta = false
+  /// - tambah = 0
+  static Future<void> rejectExtension({
+    required dynamic peminjamanId,
+  }) async {
+    try {
+      final before = await _client.from('peminjaman').select('''
+        id,
+        user:user ( username ),
+        alat:alat ( nama_alat ),
+        tambah
+      ''')
+          .eq('id', peminjamanId)
+          .maybeSingle();
+
+      final namaAlat = before?['alat']?['nama_alat']?.toString() ?? 'Alat';
+      final namaPeminjam = before?['user']?['username']?.toString() ?? 'User';
+      final tambahHari = before?['tambah'] ?? 0;
+
+      await _client.from('peminjaman').update({
+        'minta': false,
+        'tambah': 0,
+      }).eq('id', peminjamanId);
+
+      await insertLog(
+        description: 'Menolak pemanjangan $namaAlat milik $namaPeminjam (+$tambahHari hari)',
+      );
+
+      debugPrint('✅ rejectExtension sukses id=$peminjamanId');
+    } catch (e) {
+      debugPrint('❌ rejectExtension ERROR: $e');
+      rethrow;
+    }
+  }
+
   // ================= LOGOUT =================
   static Future<void> logout() async {
     await _deleteToken();

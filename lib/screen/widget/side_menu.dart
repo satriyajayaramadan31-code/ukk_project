@@ -98,6 +98,12 @@ class _SideMenuState extends State<SideMenu> {
                   if (role == "admin")
                     _menuItem(context, icon: Icons.history, title: "Log Aktivitas", keyValue: "logs"),
 
+                  if (role == "peminjam")
+                    _menuItem(context, icon: Icons.calendar_month_outlined, title: "Pemanjangan", keyValue: "panjang"),
+
+                  if (role == "petugas")
+                    _menuItem(context, icon: Icons.calendar_month_outlined, title: "Pemanjangan", keyValue: "hari"),
+
                   if (role == "petugas")
                     _menuItem(context, icon: Icons.print, title: "Laporan", keyValue: "laporan"),
 
@@ -179,6 +185,14 @@ class _SideMenuState extends State<SideMenu> {
 
             case 'pinjam':
               NavigationService.navigateTo('/pinjam');
+              break;
+
+            case 'panjang':
+              NavigationService.navigateTo('/panjang');
+              break;
+
+            case 'hari':
+              NavigationService.navigateTo('/hari');
               break;
 
             case 'logout':

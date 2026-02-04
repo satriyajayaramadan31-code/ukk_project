@@ -18,6 +18,8 @@ import '../screen/page/laporan.dart';
 import '../screen/page/alat.dart';
 import '../screen/page/peminjaman.dart';
 import '../screen/page/splash_screen.dart';
+import '../screen/page/hari.dart';
+import '../screen/page/pemanjangan.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,8 +62,7 @@ class MyApp extends StatelessWidget {
         '/login': (_) => const LoginPage(),
 
         '/dashboard': (context) {
-          final role =
-              ModalRoute.of(context)!.settings.arguments as String?;
+          final role = ModalRoute.of(context)!.settings.arguments as String?;
           return DashboardPage(role: role ?? 'peminjam');
         },
 
@@ -74,6 +75,8 @@ class MyApp extends StatelessWidget {
         '/laporan': (_) => const LaporanPage(),
         '/alat': (_) => const AlatPage(),
         '/pinjam': (_) => const PeminjamanPage(),
+        '/panjang': (_) => const PemanjanganPage(),
+        '/hari': (_) => const HariPage(),
       },
     );
   }
@@ -114,18 +117,12 @@ class _AuthGateState extends State<AuthGate> {
         arguments: role ?? 'peminjam',
       );
     } else {
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        '/login',
-        (_) => false,
-      );
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }
