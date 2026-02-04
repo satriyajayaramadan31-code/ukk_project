@@ -319,7 +319,7 @@ class _DaftarPinjamState extends State<DaftarPinjam> {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: theme.dividerColor.withOpacity(0.12),
+          color: Colors.black, width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
@@ -458,7 +458,8 @@ class _DaftarPinjamState extends State<DaftarPinjam> {
                               label: const Text('Edit'),
                               style: OutlinedButton.styleFrom(
                                 side: BorderSide(
-                                  color: theme.colorScheme.primary.withOpacity(0.35),
+                                  color: theme.colorScheme.primary,
+                                  width: 1.5,
                                 ),
                                 foregroundColor: theme.colorScheme.primary,
                                 shape: RoundedRectangleBorder(
@@ -599,8 +600,17 @@ class _DaftarPinjamState extends State<DaftarPinjam> {
                           labelText: 'Cari peminjaman',
                           prefixIcon: const Icon(Icons.search),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: theme.cardColor),
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              width: 1.5
+                            ), // tebal border
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              width: 1.5,
+                              color: Colors.black,
+                            ),
                           ),
                         ),
                       ),

@@ -38,10 +38,12 @@ class _KategoriPageState extends State<KategoriPage> {
     try {
       final categories = await _service.getCategories();
 
-      final updated = await Future.wait(categories.map((c) async {
-        final count = await _service.countItemsInCategory(c.id);
-        return KategoriAlat(id: c.id, name: c.name, totalItems: count);
-      }));
+      final updated = await Future.wait(
+        categories.map((c) async {
+          final count = await _service.countItemsInCategory(c.id);
+          return KategoriAlat(id: c.id, name: c.name, totalItems: count);
+        }),
+      );
 
       setState(() {
         _categories = updated;
@@ -60,8 +62,8 @@ class _KategoriPageState extends State<KategoriPage> {
       _filteredCategories = query.isEmpty
           ? _categories
           : _categories
-              .where((c) => c.name.toLowerCase().contains(query))
-              .toList();
+                .where((c) => c.name.toLowerCase().contains(query))
+                .toList();
     });
   }
 
@@ -72,7 +74,11 @@ class _KategoriPageState extends State<KategoriPage> {
 
       setState(() {
         _categories.add(
-          KategoriAlat(id: newCat.id, name: newCat.name, totalItems: totalItems),
+          KategoriAlat(
+            id: newCat.id,
+            name: newCat.name,
+            totalItems: totalItems,
+          ),
         );
         _filterCategories();
       });
@@ -161,9 +167,7 @@ class _KategoriPageState extends State<KategoriPage> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: theme.dividerColor.withOpacity(0.12),
-        ),
+        border: Border.all(color: Colors.black, width: 1.5),
         boxShadow: [
           BoxShadow(
             blurRadius: 18,
@@ -208,8 +212,9 @@ class _KategoriPageState extends State<KategoriPage> {
                         turns: isExpanded ? 0.5 : 0.0,
                         child: Icon(
                           Icons.expand_more,
-                          color:
-                              theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                          color: theme.textTheme.bodyMedium?.color?.withOpacity(
+                            0.7,
+                          ),
                         ),
                       ),
                     ],
@@ -239,15 +244,16 @@ class _KategoriPageState extends State<KategoriPage> {
                               label: const Text('Edit'),
                               style: OutlinedButton.styleFrom(
                                 side: BorderSide(
-                                  color: theme.colorScheme.primary
-                                      .withOpacity(0.35),
+                                  color: theme.colorScheme.primary,
+                                  width: 1.5,
                                 ),
                                 foregroundColor: theme.colorScheme.primary,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14),
                                 ),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                               ),
                               onPressed: () {
                                 showDialog(
@@ -271,8 +277,9 @@ class _KategoriPageState extends State<KategoriPage> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14),
                                 ),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                               ),
                               onPressed: () {
                                 showDialog(
@@ -325,7 +332,17 @@ class _KategoriPageState extends State<KategoriPage> {
                           labelText: 'Cari kategori',
                           prefixIcon: const Icon(Icons.search),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              width: 1.5
+                            ), // tebal border
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              width: 1.5,
+                              color: Colors.black,
+                            ),
                           ),
                         ),
                       ),

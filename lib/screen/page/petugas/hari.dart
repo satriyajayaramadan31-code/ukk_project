@@ -5,6 +5,9 @@ import '../../widget/app_bar.dart';
 import '../../widget/side_menu.dart';
 import 'package:engine_rent_app/service/supabase_service.dart';
 
+// realtime
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 class HariPage extends StatefulWidget {
   const HariPage({super.key});
 
@@ -18,28 +21,92 @@ class _HariPageState extends State<HariPage> {
   bool _loading = true;
   List<Map<String, dynamic>> _requests = [];
 
+  // realtime
+  RealtimeChannel? _channel;
+  bool _realtimeReady = false;
+
   @override
   void initState() {
     super.initState();
     _loadRequests();
+    _subscribeRealtime();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _unsubscribeRealtime();
     super.dispose();
   }
 
-  Future<void> _loadRequests() async {
-    setState(() => _loading = true);
-    final data = await SupabaseService.fetchPemanjanganRequestsAdmin();
-    if (!mounted) return;
-    setState(() {
-      _requests = data;
-      _loading = false;
-    });
+  // ===================== REALTIME =====================
+  void _subscribeRealtime() {
+    try {
+      final supabase = Supabase.instance.client;
+
+      // hindari double subscribe
+      _channel?.unsubscribe();
+
+      _channel = supabase.channel('hari_admin_requests_realtime');
+
+      _channel!
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'peminjaman', // <-- ganti kalau tabel request beda
+            callback: (payload) async {
+              if (!mounted) return;
+              await _loadRequests();
+            },
+          )
+          .subscribe((status, error) {
+            if (!mounted) return;
+            if (status == RealtimeSubscribeStatus.subscribed) {
+              setState(() => _realtimeReady = true);
+            }
+          });
+    } catch (e) {
+      debugPrint('❌ REALTIME SUBSCRIBE ERROR: $e');
+    }
   }
 
+  Future<void> _unsubscribeRealtime() async {
+    try {
+      if (_channel != null) {
+        await _channel!.unsubscribe();
+        _channel = null;
+      }
+    } catch (e) {
+      debugPrint('❌ REALTIME UNSUBSCRIBE ERROR: $e');
+    }
+  }
+
+  // ===================== LOAD REQUESTS =====================
+  Future<void> _loadRequests() async {
+    if (!mounted) return;
+
+    setState(() => _loading = true);
+
+    try {
+      final data = await SupabaseService.fetchPemanjanganRequestsAdmin();
+      if (!mounted) return;
+
+      setState(() {
+        _requests = data;
+        _loading = false;
+      });
+    } catch (e) {
+      debugPrint('❌ LOAD REQUESTS ERROR: $e');
+      if (!mounted) return;
+
+      setState(() {
+        _requests = [];
+        _loading = false;
+      });
+    }
+  }
+
+  // ===================== FILTER =====================
   List<Map<String, dynamic>> get _filteredRequests {
     final q = _searchController.text.toLowerCase().trim();
     if (q.isEmpty) return _requests;
@@ -51,6 +118,7 @@ class _HariPageState extends State<HariPage> {
     }).toList();
   }
 
+  // ===================== HELPERS =====================
   String _formatDate(dynamic date) {
     if (date == null) return '-';
     try {
@@ -61,10 +129,12 @@ class _HariPageState extends State<HariPage> {
     }
   }
 
+  // ===================== ACTIONS =====================
   Future<void> _handleApprove(dynamic peminjamanId) async {
     try {
       await SupabaseService.approveExtension(peminjamanId: peminjamanId);
 
+      // realtime akan refresh otomatis, tapi ini biar respons cepat
       if (!mounted) return;
       await _loadRequests();
     } catch (e) {
@@ -79,6 +149,7 @@ class _HariPageState extends State<HariPage> {
     try {
       await SupabaseService.rejectExtension(peminjamanId: peminjamanId);
 
+      // realtime akan refresh otomatis, tapi ini biar respons cepat
       if (!mounted) return;
       await _loadRequests();
     } catch (e) {
@@ -122,8 +193,7 @@ class _HariPageState extends State<HariPage> {
       barrierDismissible: false,
       builder: (_) => ConfirmActionDialog(
         title: 'Tolak Permintaan',
-        message:
-            'Tolak permintaan pemanjangan untuk "$alatNama" oleh $peminjamNama?',
+        message: 'Tolak permintaan pemanjangan untuk "$alatNama" oleh $peminjamNama?',
         confirmText: 'Tolak',
         cancelText: 'Batal',
       ),
@@ -134,6 +204,7 @@ class _HariPageState extends State<HariPage> {
     }
   }
 
+  // ===================== UI =====================
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -149,30 +220,30 @@ class _HariPageState extends State<HariPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            /// SEARCH
-            TextField(
-              controller: _searchController,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                hintText: 'Cari alat atau peminjam',
-                prefixIcon: const Icon(Icons.search),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: theme.dividerColor, width: 1.4),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: theme.colorScheme.primary,
-                    width: 1.5,
+            /// SEARCH + realtime icon
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: 'Cari alat atau peminjam',
+                      prefixIcon: const Icon(Icons.search),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: theme.dividerColor, width: 1.5),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 10),
+              ],
             ),
 
             const SizedBox(height: 16),
@@ -194,8 +265,7 @@ class _HariPageState extends State<HariPage> {
               /// LIST PERMINTAAN
               ..._filteredRequests.map((item) {
                 final alatNama = item['alat']?['nama_alat']?.toString() ?? '-';
-                final peminjamNama =
-                    item['user']?['username']?.toString() ?? '-';
+                final peminjamNama = item['user']?['username']?.toString() ?? '-';
 
                 final pengulangan = (item['pengulangan'] ?? 0) is int
                     ? (item['pengulangan'] ?? 0)
@@ -211,8 +281,7 @@ class _HariPageState extends State<HariPage> {
                 DateTime? tanggalLama;
                 DateTime? tanggalBaru;
                 try {
-                  tanggalLama =
-                      DateTime.parse(item['tanggal_kembali'].toString());
+                  tanggalLama = DateTime.parse(item['tanggal_kembali'].toString());
                   tanggalBaru = tanggalLama.add(Duration(days: tambahHari));
                 } catch (_) {}
 
@@ -276,7 +345,7 @@ class _HariPageState extends State<HariPage> {
                         ),
                         const SizedBox(height: 18),
 
-                        /// ACTION BUTTON (SETUJU DULU, BARU TOLAK)
+                        /// ACTION BUTTON
                         Row(
                           children: [
                             /// SETUJU
@@ -285,8 +354,7 @@ class _HariPageState extends State<HariPage> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: theme.colorScheme.primary,
                                   foregroundColor: theme.colorScheme.onPrimary,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 14),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(6),
                                   ),
@@ -321,8 +389,7 @@ class _HariPageState extends State<HariPage> {
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(6),
                                   ),
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 14),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
                                 ),
                                 onPressed: () async {
                                   await _confirmReject(
@@ -415,7 +482,6 @@ class ConfirmActionDialog extends StatelessWidget {
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 18),
-
             Row(
               children: [
                 /// CONFIRM
@@ -439,7 +505,6 @@ class ConfirmActionDialog extends StatelessWidget {
                     ),
                   ),
                 ),
-
                 const SizedBox(width: 12),
 
                 /// CANCEL

@@ -469,18 +469,21 @@ class _PemanjanganPageState extends State<PemanjanganPage> {
                     decoration: InputDecoration(
                       labelText: 'Cari alat',
                       prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(width: 1.5), // tebal border
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        width: 1.5,
+                        color: Colors.black,
+                      ),
+                    ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 10),
-                Tooltip(
-                  message: _isRealtimeReady ? 'Realtime aktif' : 'Realtime belum tersambung',
-                  child: Icon(
-                    _isRealtimeReady ? Icons.wifi : Icons.wifi_off,
-                    color: _isRealtimeReady ? AppTheme.primary : Colors.grey,
-                  ),
-                )
               ],
             ),
             const SizedBox(height: 16),

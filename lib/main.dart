@@ -18,8 +18,8 @@ import 'screen/page/petugas/laporan.dart';
 import 'screen/page/peminjam/alat.dart';
 import 'screen/page/peminjam/peminjaman.dart';
 import 'screen/page/all/splash_screen.dart';
-// import 'screen/page/petugas/hari.dart';
-// import 'screen/page/peminjam/pemanjangan.dart';
+import 'screen/page/petugas/hari.dart';
+import 'screen/page/peminjam/pemanjangan.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -75,8 +75,8 @@ class MyApp extends StatelessWidget {
         '/laporan': (_) => const LaporanPage(),
         '/alat': (_) => const AlatPage(),
         '/pinjam': (_) => const PeminjamanPage(),
-        // '/panjang': (_) => const PemanjanganPage(),
-        // '/hari': (_) => const HariPage(),
+        '/panjang': (_) => const PemanjanganPage(),
+        '/hari': (_) => const HariPage(),
       },
     );
   }

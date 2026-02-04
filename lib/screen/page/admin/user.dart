@@ -39,12 +39,14 @@ class _UserPageState extends State<UserPage> {
     final res = await SupabaseService.getUsers();
     setState(() {
       _users = res
-          .map((e) => User(
-                id: e['id'],
-                username: e['username'],
-                role: e['role'],
-                password: e['password'],
-              ))
+          .map(
+            (e) => User(
+              id: e['id'],
+              username: e['username'],
+              role: e['role'],
+              password: e['password'],
+            ),
+          )
           .toList();
       _filteredUsers = _users;
     });
@@ -55,7 +57,9 @@ class _UserPageState extends State<UserPage> {
     setState(() {
       _filteredUsers = query.isEmpty
           ? _users
-          : _users.where((u) => u.username.toLowerCase().contains(query)).toList();
+          : _users
+                .where((u) => u.username.toLowerCase().contains(query))
+                .toList();
     });
   }
 
@@ -69,7 +73,12 @@ class _UserPageState extends State<UserPage> {
     if (success) _fetchUsers();
   }
 
-  Future<void> _editUser(User user, String username, String role, String password) async {
+  Future<void> _editUser(
+    User user,
+    String username,
+    String role,
+    String password,
+  ) async {
     final success = await SupabaseService.editUser(
       id: user.id,
       username: username,
@@ -152,8 +161,14 @@ class _UserPageState extends State<UserPage> {
       margin: const EdgeInsets.only(bottom: 12),
       child: Material(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
         elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(
+            color: Colors.black, // warna border
+            width: 1.5, // tebal border
+          ),
+        ),
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
           onTap: () => _toggleExpand(user.id),
@@ -172,11 +187,14 @@ class _UserPageState extends State<UserPage> {
                       height: 42,
                       decoration: BoxDecoration(
                         color: theme.colorScheme.primary.withOpacity(0.12),
+                        border: Border.all(color: Colors.black, width: 1.5),
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
                       child: Text(
-                        user.username.isNotEmpty ? user.username[0].toUpperCase() : '?',
+                        user.username.isNotEmpty
+                            ? user.username[0].toUpperCase()
+                            : '?',
                         style: theme.textTheme.titleLarge?.copyWith(
                           color: theme.colorScheme.primary,
                           fontWeight: FontWeight.bold,
@@ -199,7 +217,10 @@ class _UserPageState extends State<UserPage> {
                           Align(
                             alignment: Alignment.centerLeft,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
                               decoration: BoxDecoration(
                                 color: roleColor.withOpacity(0.14),
                                 borderRadius: BorderRadius.circular(999),
@@ -252,7 +273,10 @@ class _UserPageState extends State<UserPage> {
                     padding: const EdgeInsets.only(top: 14),
                     child: Column(
                       children: [
-                        Divider(color: theme.dividerColor.withOpacity(0.7), height: 1),
+                        Divider(
+                          color: theme.dividerColor.withOpacity(0.7),
+                          height: 1,
+                        ),
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -264,7 +288,13 @@ class _UserPageState extends State<UserPage> {
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
                                   ),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  side: BorderSide(
+                                    color: Colors.black,
+                                    width: 1.5,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                 ),
                                 onPressed: () {
                                   showDialog(
@@ -272,7 +302,12 @@ class _UserPageState extends State<UserPage> {
                                     builder: (_) => EditUserDialog(
                                       user: user,
                                       onSubmit: (username, role, password) =>
-                                          _editUser(user, username, role, password),
+                                          _editUser(
+                                            user,
+                                            username,
+                                            role,
+                                            password,
+                                          ),
                                     ),
                                   );
                                 },
@@ -289,7 +324,9 @@ class _UserPageState extends State<UserPage> {
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
                                   ),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                 ),
                                 onPressed: () {
                                   showDialog(
@@ -307,8 +344,9 @@ class _UserPageState extends State<UserPage> {
                       ],
                     ),
                   ),
-                  crossFadeState:
-                      isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                  crossFadeState: isExpanded
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
                   duration: const Duration(milliseconds: 220),
                 ),
               ],
@@ -341,7 +379,15 @@ class _UserPageState extends State<UserPage> {
                     labelText: 'Search user',
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(width: 1.5), // tebal border
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        width: 1.5,
+                        color: Colors.black,
+                      ),
                     ),
                   ),
                 ),
@@ -356,14 +402,15 @@ class _UserPageState extends State<UserPage> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 14,
+                  ),
                 ),
                 onPressed: () {
                   showDialog(
                     context: context,
-                    builder: (_) => AddUserDialog(
-                      onSubmit: _addUser,
-                    ),
+                    builder: (_) => AddUserDialog(onSubmit: _addUser),
                   );
                 },
               ),
@@ -384,7 +431,9 @@ class _UserPageState extends State<UserPage> {
               ),
             )
           else
-            ..._filteredUsers.map((user) => _buildUserCard(user, theme)).toList(),
+            ..._filteredUsers
+                .map((user) => _buildUserCard(user, theme))
+                .toList(),
         ],
       ),
     );

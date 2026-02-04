@@ -82,140 +82,133 @@ class _LogsPageState extends State<LogsPage> {
       body: ListView(
         padding: const EdgeInsets.all(14),
         children: [
-          // SEARCH
-          TextField(
-            controller: _searchController,
-            onChanged: (value) {
-              setState(() {
-                _searchTerm = value;
-              });
-            },
-            decoration: InputDecoration(
-              labelText: "Cari username atau deskripsi",
-              prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+          // SEARCH + SORT ROW
+          Row(
+            children: [
+              // SEARCH FIELD
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) {
+                    setState(() {
+                      _searchTerm = value;
+                    });
+                  },
+                  decoration: InputDecoration(
+                    labelText: "Cari username atau deskripsi",
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(width: 1.5),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        width: 1.5,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
+
+              const SizedBox(width: 10),
+
+              // SORT BUTTON
+              Tooltip(
+                message:
+                    _ascending ? 'Urut: Terlama → Terbaru' : 'Urut: Terbaru → Terlama',
+                child: Material(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(10),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => setState(() => _ascending = !_ascending),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.black, width: 1.5),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.sort, size: 18),
+                          const SizedBox(width: 6),
+                          Text(
+                            _ascending ? "Terlama" : "Terbaru",
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
 
           const SizedBox(height: 14),
 
-          // TABLE CARD (header + table dalam 1 card)
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            color: theme.colorScheme.surface,
-            elevation: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // HEADER dalam card
-                  Row(
-                    children: [
-                      Text(
-                        'Riwayat',
-                        style: theme.textTheme.headlineSmall,
-                      ),
-                      const Spacer(),
+          // LIST OF LOG CARDS
+          Column(
+            children: filteredLogs.map((log) {
+              // format tanggal
+              String formattedDate = '';
+              final rawDate = log['created_at'];
+              if (rawDate != null) {
+                final dt = DateTime.tryParse(rawDate);
+                if (dt != null) {
+                  formattedDate = DateFormat('dd/MM/yyyy HH:mm').format(dt);
+                }
+              }
 
-                      Tooltip(
-                        message: _ascending
-                            ? 'Urut: Telama → Terbaru'
-                            : 'Urut: Terbaru → Terlama',
-                        child: Material(
-                          color: theme.colorScheme.surface,
-                          borderRadius: BorderRadius.circular(10),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(10),
-                            onTap: () => setState(() => _ascending = !_ascending),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 7,
-                              ),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.grey.shade300),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.sort, size: 18),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    _ascending ? "Terlama" : "Terbaru",
-                                    style: theme.textTheme.bodyLarge,
-                                  ),
-                                ],
-                              ),
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: Colors.black,
+                    width: 1.5
+                  )
+                ),
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // username dan tanggal
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              log['username'] ?? '',
+                              style: theme.textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                           ),
-                        ),
+                          Text(
+                            formattedDate,
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      // deskripsi/aksi
+                      Text(
+                        log['aksi'] ?? '',
+                        style: theme.textTheme.bodyMedium,
                       ),
                     ],
                   ),
-
-                  const SizedBox(height: 10),
-
-                  // TABLE
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      headingTextStyle: theme.textTheme.bodyMedium,
-                      dataTextStyle: theme.textTheme.bodyMedium,
-                      dividerThickness: 0,
-                      border: const TableBorder(
-                        bottom: BorderSide(
-                          color: Colors.black,
-                          width: 1,
-                        ),
-                        horizontalInside: BorderSide(
-                          color: Colors.black,
-                          width: 1,
-                        ),
-                      ),
-                      columns: const [
-                        DataColumn(label: Text('Username')),
-                        DataColumn(label: Text('Deskripsi')),
-                        DataColumn(label: Text('Tanggal')),
-                      ],
-                      rows: filteredLogs.map((log) {
-                        // format tanggal
-                        String formattedDate = '';
-                        final rawDate = log['created_at'];
-                        if (rawDate != null) {
-                          final dt = DateTime.tryParse(rawDate);
-                          if (dt != null) {
-                            formattedDate =
-                                DateFormat('dd/MM/yyyy HH:mm').format(dt);
-                          }
-                        }
-
-                        return DataRow(
-                          cells: [
-                            DataCell(Text(log['username'] ?? '')),
-                            DataCell(
-                              SizedBox(
-                                width: 450,
-                                child: Text(
-                                  log['aksi'] ?? '',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ),
-                            DataCell(Text(formattedDate)),
-                          ],
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),

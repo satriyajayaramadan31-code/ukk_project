@@ -323,16 +323,21 @@ class _PeminjamanPageState extends State<PeminjamanPage> {
             decoration: InputDecoration(
               labelText: 'Cari peminjaman',
               prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(width: 1.5), // tebal border
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        width: 1.5,
+                        color: Colors.black,
+                      ),
+                    ),
             ),
           ),
 
           const SizedBox(height: 18),
-
-          // ===== TITLE SECTION =====
-          _sectionTitle("Daftar Peminjaman", theme),
 
           // ===== CONTENT =====
           if (_loading)
@@ -366,8 +371,8 @@ class _PeminjamanPageState extends State<PeminjamanPage> {
                     color: theme.colorScheme.surface,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: theme.dividerColor.withOpacity(0.7),
-                      width: 1,
+                      color: Colors.black,
+                      width: 1.5,
                     ),
                   ),
                   child: Theme(

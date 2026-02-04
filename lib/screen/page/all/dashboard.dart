@@ -49,24 +49,18 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void dispose() {
     _debounceTimer?.cancel();
-
     if (_loanChannel != null) {
       Supabase.instance.client.removeChannel(_loanChannel!);
-      _loanChannel = null;
     }
-
     if (_equipmentChannel != null) {
       Supabase.instance.client.removeChannel(_equipmentChannel!);
-      _equipmentChannel = null;
     }
-
     super.dispose();
   }
 
   int _toInt(dynamic v) {
     if (v == null) return 0;
     if (v is int) return v;
-    if (v is double) return v.toInt();
     if (v is num) return v.toInt();
     return int.tryParse(v.toString()) ?? 0;
   }
@@ -75,38 +69,30 @@ class _DashboardPageState extends State<DashboardPage> {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
       if (!mounted) return;
-      _loadDashboard(silent: true); // silent biar ga bikin loading spinner terus
+      _loadDashboard(silent: true);
     });
   }
 
   void _initRealtime() {
     final client = Supabase.instance.client;
 
-    // ===== SUBSCRIBE PEMINJAMAN =====
     _loanChannel = client
         .channel('dashboard-peminjaman')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'peminjaman',
-          callback: (payload) {
-            // setiap ada insert/update/delete peminjaman -> reload dashboard
-            _scheduleReload();
-          },
+          callback: (payload) => _scheduleReload(),
         )
         .subscribe();
 
-    // ===== SUBSCRIBE ALAT =====
     _equipmentChannel = client
         .channel('dashboard-alat')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'alat',
-          callback: (payload) {
-            // kalau alat berubah -> total alat berubah
-            _scheduleReload();
-          },
+          callback: (payload) => _scheduleReload(),
         )
         .subscribe();
   }
@@ -119,43 +105,30 @@ class _DashboardPageState extends State<DashboardPage> {
         _loading = true;
         _error = null;
       });
-    } else {
-      // silent reload: jangan ganggu UI loading
-      _error = null;
     }
 
     try {
       final statsRaw = await SupabaseService.getDashboardStats(role: widget.role);
-      final activitiesRaw =
-          await SupabaseService.getDashboardActivities(role: widget.role);
+      final activitiesRaw = await SupabaseService.getDashboardActivities(role: widget.role);
 
       if (!mounted) return;
 
-      final fixedStats = <String, int>{
-        'totalEquipment': _toInt(statsRaw['totalEquipment']),
-        'activeLoans': _toInt(statsRaw['activeLoans']),
-        'pendingApprovals': _toInt(statsRaw['pendingApprovals']),
-        'overdueReturns': _toInt(statsRaw['overdueReturns']),
-      };
-
       setState(() {
-        _stats = fixedStats;
+        _stats = {
+          'totalEquipment': _toInt(statsRaw['totalEquipment']),
+          'activeLoans': _toInt(statsRaw['activeLoans']),
+          'pendingApprovals': _toInt(statsRaw['pendingApprovals']),
+          'overdueReturns': _toInt(statsRaw['overdueReturns']),
+        };
         _activities = List<Map<String, dynamic>>.from(activitiesRaw);
         _loading = false;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
-
       setState(() {
         _error = e.toString();
         _loading = false;
-        _stats = const {
-          'totalEquipment': 0,
-          'activeLoans': 0,
-          'pendingApprovals': 0,
-          'overdueReturns': 0,
-        };
-        _activities = const [];
       });
     }
   }
@@ -164,7 +137,6 @@ class _DashboardPageState extends State<DashboardPage> {
 
   String _getItemName(Map<String, dynamic> row) {
     if (row['nama_alat'] != null) return row['nama_alat'].toString();
-
     final alat = row['alat'];
     if (alat is Map && alat['nama_alat'] != null) {
       return alat['nama_alat'].toString();
@@ -172,23 +144,15 @@ class _DashboardPageState extends State<DashboardPage> {
     return '-';
   }
 
-  /// Normalisasi status jadi konsisten (Huruf besar depan)
   String _getStatus(Map<String, dynamic> row) {
     final raw = (row['status'] ?? '').toString().trim().toLowerCase();
-
     switch (raw) {
-      case 'menunggu':
-        return 'Menunggu';
-      case 'diproses':
-        return 'Diproses';
-      case 'dipinjam':
-        return 'Dipinjam';
-      case 'dikembalikan':
-        return 'Dikembalikan';
-      case 'terlambat':
-        return 'Terlambat';
-      case 'ditolak':
-        return 'Ditolak';
+      case 'menunggu': return 'Menunggu';
+      case 'diproses': return 'Diproses';
+      case 'dipinjam': return 'Dipinjam';
+      case 'dikembalikan': return 'Dikembalikan';
+      case 'terlambat': return 'Terlambat';
+      case 'ditolak': return 'Ditolak';
       default:
         if (raw.isEmpty) return '-';
         return raw[0].toUpperCase() + raw.substring(1);
@@ -198,15 +162,15 @@ class _DashboardPageState extends State<DashboardPage> {
   String _getTimeAgo(Map<String, dynamic> row) {
     final createdAt = row['created_at'];
     if (createdAt == null) return '-';
-
     final dt = DateTime.tryParse(createdAt.toString());
     if (dt == null) return '-';
-
     return SupabaseService.timeAgo(dt.toLocal());
   }
 
-  Widget _buildStatsGrid(ThemeData theme) {
-    if (_loading) {
+  // ================= UI COMPONENTS =================
+
+  Widget _buildStatsGrid() {
+    if (_loading && _stats['totalEquipment'] == 0) {
       return GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
@@ -217,61 +181,86 @@ class _DashboardPageState extends State<DashboardPage> {
           mainAxisSpacing: 16,
           childAspectRatio: 1.6,
         ),
-        itemBuilder: (context, index) {
-          return Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Center(
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          );
-        },
+        itemBuilder: (context, index) => Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
       );
     }
 
-    final List<Widget> statCards = [
+    final cards = [
       StatCard(
         title: 'Alat',
-        value: (_stats['totalEquipment'] ?? 0).toString(),
+        value: _stats['totalEquipment'].toString(),
         icon: Icons.inventory_2,
         iconColor: AppTheme.statusReturned,
       ),
       StatCard(
         title: 'Dipinjam',
-        value: (_stats['activeLoans'] ?? 0).toString(),
+        value: _stats['activeLoans'].toString(),
         icon: Icons.assignment,
         iconColor: AppTheme.statusBorrowed,
       ),
       StatCard(
         title: 'Menunggu',
-        value: (_stats['pendingApprovals'] ?? 0).toString(),
+        value: _stats['pendingApprovals'].toString(),
         icon: Icons.hourglass_top,
         iconColor: AppTheme.statusPending,
       ),
       StatCard(
         title: 'Terlambat',
-        value: (_stats['overdueReturns'] ?? 0).toString(),
+        value: _stats['overdueReturns'].toString(),
         icon: Icons.warning_amber,
         iconColor: AppTheme.statusLate,
       ),
     ];
 
-    return GridView.builder(
+    return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: statCards.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.6,
-      ),
-      itemBuilder: (context, index) => statCards[index],
+      crossAxisCount: 2,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      childAspectRatio: 1.6,
+      children: cards,
     );
   }
 
-  // ================= UI =================
+  Widget _buildActivityList(ThemeData theme) {
+    if (_loading && _activities.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_activities.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Text('Belum ada aktivitas.'),
+        ),
+      );
+    }
+
+    // Menggunakan asMap() untuk memastikan isLast akurat
+    return Column(
+      children: _activities.asMap().entries.map((entry) {
+        final index = entry.key;
+        final data = entry.value;
+        final isLastItem = index == _activities.length - 1;
+
+        return ActivityItem(
+          item: _getItemName(data),
+          status: _getStatus(data),
+          time: _getTimeAgo(data),
+          isLast: isLastItem,
+        );
+      }).toList(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -289,111 +278,62 @@ class _DashboardPageState extends State<DashboardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ================= STAT GRID =================
-              _buildStatsGrid(theme),
-
-              // ================= ERROR CARD =================
+              _buildStatsGrid(),
+              
               if (_error != null) ...[
-                const SizedBox(height: 12),
-                Card(
-                  color: Colors.red.withOpacity(0.08),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.red.withOpacity(0.35)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.error_outline, color: Colors.red),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Dashboard gagal dimuat:\n$_error',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.red,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () => _loadDashboard(silent: false),
-                          child: const Text('Coba lagi'),
-                        )
-                      ],
-                    ),
-                  ),
-                ),
+                const SizedBox(height: 16),
+                _buildErrorCard(theme),
               ],
 
               const SizedBox(height: 24),
 
-              // ================= AKTIVITAS =================
               Card(
                 color: theme.colorScheme.surface,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 2,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Aktivitas Terkini',
-                              style: theme.textTheme.headlineSmall,
-                            ),
-                          ),
-                        ],
-                      ),
+                      Text('Aktivitas Terkini', style: theme.textTheme.headlineSmall),
                       const SizedBox(height: 16),
-
-                      if (_loading) ...[
-                        const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(16),
-                            child: CircularProgressIndicator(),
-                          ),
-                        ),
-                      ] else if (_error != null) ...[
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Text(
-                              'Gagal memuat aktivitas\n$_error',
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: Colors.red,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ] else if (_activities.isEmpty) ...[
-                        const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(12),
-                            child: Text('Belum ada aktivitas.'),
-                          ),
-                        ),
-                      ] else ...[
-                        for (int i = 0; i < _activities.length; i++)
-                          ActivityItem(
-                            item: _getItemName(_activities[i]),
-                            status: _getStatus(_activities[i]),
-                            time: _getTimeAgo(_activities[i]),
-                            isLast: i == _activities.length - 1,
-                          ),
-                      ],
+                      _buildActivityList(theme),
                     ],
                   ),
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorCard(ThemeData theme) {
+    return Card(
+      color: Colors.red.withOpacity(0.08),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.red.withOpacity(0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Gagal memuat data: $_error',
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            ),
+            TextButton(
+              onPressed: () => _loadDashboard(silent: false),
+              child: const Text('Coba lagi'),
+            )
+          ],
         ),
       ),
     );

@@ -48,11 +48,6 @@ class _LaporanPageState extends State<LaporanPage> {
     _loadReport();
   }
 
-  bool _isMobile(BuildContext context) {
-    final w = MediaQuery.of(context).size.width;
-    return w < 600;
-  }
-
   Future<void> _loadReport() async {
     if (!mounted) return;
     setState(() => loading = true);
@@ -339,7 +334,6 @@ class _LaporanPageState extends State<LaporanPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final text = theme.textTheme;
-    final isMobile = _isMobile(context);
 
     return Scaffold(
       appBar: const AppBarWithMenu(title: 'Laporan'),
@@ -357,8 +351,10 @@ class _LaporanPageState extends State<LaporanPage> {
                 _SimpleCard(
                   child: Padding(
                     padding: const EdgeInsets.all(14),
-                    child: isMobile
-                        ? Column(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text("Laporan", style: text.headlineSmall),
@@ -367,57 +363,25 @@ class _LaporanPageState extends State<LaporanPage> {
                                 "Laporan dan statistik peminjaman alat",
                                 style: text.bodyMedium,
                               ),
-                              const SizedBox(height: 12),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  onPressed: handleExport,
-                                  icon: const Icon(Icons.download),
-                                  label: const Text("Unduh PDF"),
-                                  style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
-                                      horizontal: 12,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          )
-                        : Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text("Laporan", style: text.headlineSmall),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      "Laporan dan statistik peminjaman alat",
-                                      style: text.bodyMedium,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              ElevatedButton.icon(
-                                onPressed: handleExport,
-                                icon: const Icon(Icons.download),
-                                label: const Text("Unduh"),
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                    horizontal: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
                             ],
                           ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: handleExport,
+                          icon: const Icon(Icons.download),
+                          label: const Text("Unduh"),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 
@@ -427,129 +391,69 @@ class _LaporanPageState extends State<LaporanPage> {
                 _SimpleCard(
                   child: Padding(
                     padding: const EdgeInsets.all(14),
-                    child: isMobile
-                        ? Column(
-                            children: [
-                              DropdownButtonFormField<String>(
-                                style: text.bodyMedium,
-                                initialValue: reportType,
-                                decoration: const InputDecoration(
-                                  labelText: "Jenis Laporan",
-                                  border: OutlineInputBorder(),
-                                ),
-                                items: const [
-                                  DropdownMenuItem(
-                                    value: "equipment",
-                                    child: Text("Alat"),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: "user",
-                                    child: Text("Pengguna"),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: "category",
-                                    child: Text("Kategori"),
-                                  ),
-                                ],
-                                onChanged: (v) async {
-                                  if (v == null) return;
-                                  setState(() => reportType = v);
-                                  await _loadReport();
-                                },
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            style: text.bodyMedium,
+                            initialValue: reportType,
+                            decoration: const InputDecoration(
+                              labelText: "Jenis Laporan",
+                              border: OutlineInputBorder(),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: "equipment",
+                                child: Text("Alat"),
                               ),
-                              const SizedBox(height: 12),
-                              DropdownButtonFormField<String>(
-                                style: text.bodyMedium,
-                                initialValue: timePeriod,
-                                decoration: const InputDecoration(
-                                  labelText: "Periode",
-                                  border: OutlineInputBorder(),
-                                ),
-                                items: const [
-                                  DropdownMenuItem(
-                                    value: "week",
-                                    child: Text("Minggu Ini"),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: "month",
-                                    child: Text("Bulan Ini"),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: "year",
-                                    child: Text("Tahun Ini"),
-                                  ),
-                                ],
-                                onChanged: (v) async {
-                                  if (v == null) return;
-                                  setState(() => timePeriod = v);
-                                  await _loadReport();
-                                },
+                              DropdownMenuItem(
+                                value: "user",
+                                child: Text("Pengguna"),
+                              ),
+                              DropdownMenuItem(
+                                value: "category",
+                                child: Text("Kategori"),
                               ),
                             ],
-                          )
-                        : Row(
-                            children: [
-                              Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  style: text.bodyMedium,
-                                  initialValue: reportType,
-                                  decoration: const InputDecoration(
-                                    labelText: "Jenis Laporan",
-                                    border: OutlineInputBorder(),
-                                  ),
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: "equipment",
-                                      child: Text("Alat"),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: "user",
-                                      child: Text("Pengguna"),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: "category",
-                                      child: Text("Kategori"),
-                                    ),
-                                  ],
-                                  onChanged: (v) async {
-                                    if (v == null) return;
-                                    setState(() => reportType = v);
-                                    await _loadReport();
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  style: text.bodyMedium,
-                                  initialValue: timePeriod,
-                                  decoration: const InputDecoration(
-                                    labelText: "Periode",
-                                    border: OutlineInputBorder(),
-                                  ),
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: "week",
-                                      child: Text("Minggu Ini"),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: "month",
-                                      child: Text("Bulan Ini"),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: "year",
-                                      child: Text("Tahun Ini"),
-                                    ),
-                                  ],
-                                  onChanged: (v) async {
-                                    if (v == null) return;
-                                    setState(() => timePeriod = v);
-                                    await _loadReport();
-                                  },
-                                ),
-                              ),
-                            ],
+                            onChanged: (v) async {
+                              if (v == null) return;
+                              setState(() => reportType = v);
+                              await _loadReport();
+                            },
                           ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            style: text.bodyMedium,
+                            initialValue: timePeriod,
+                            decoration: const InputDecoration(
+                              labelText: "Periode",
+                              border: OutlineInputBorder(),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: "week",
+                                child: Text("Minggu Ini"),
+                              ),
+                              DropdownMenuItem(
+                                value: "month",
+                                child: Text("Bulan Ini"),
+                              ),
+                              DropdownMenuItem(
+                                value: "year",
+                                child: Text("Tahun Ini"),
+                              ),
+                            ],
+                            onChanged: (v) async {
+                              if (v == null) return;
+                              setState(() => timePeriod = v);
+                              await _loadReport();
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 
@@ -603,39 +507,30 @@ class _LaporanPageState extends State<LaporanPage> {
                 // ===================== MAIN REPORT =====================
                 const _SectionTitle(title: "Laporan Utama"),
                 const SizedBox(height: 8),
-                if (isMobile)
-                  _MobileReportList(titleCol: _mainTitle(), data: mainReports)
-                else
-                  _MainTable(titleCol: _mainTitle(), data: mainReports),
+                _MainTable(titleCol: _mainTitle(), data: mainReports),
 
                 const SizedBox(height: 16),
 
                 // ===================== INSIGHTS =====================
                 const _SectionTitle(title: "Alat Paling Populer"),
                 const SizedBox(height: 8),
-                if (isMobile)
-                  _MobileInsightList(rows: popularEquipment, isPopular: true)
-                else
-                  _InsightTable(
-                    title: "Alat Paling Populer",
-                    columns: const ["Nama Alat", "Total Pinjam"],
-                    rows: popularEquipment,
-                    isPopular: true,
-                  ),
+                _InsightTable(
+                  title: "Alat Paling Populer",
+                  columns: const ["Nama Alat", "Total Pinjam"],
+                  rows: popularEquipment,
+                  isPopular: true,
+                ),
 
                 const SizedBox(height: 14),
 
                 const _SectionTitle(title: "Perlu Perhatian"),
                 const SizedBox(height: 8),
-                if (isMobile)
-                  _MobileInsightList(rows: needAttention, isPopular: false)
-                else
-                  _InsightTable(
-                    title: "Perlu Perhatian",
-                    columns: const ["Nama Alat", "Terlambat"],
-                    rows: needAttention,
-                    isPopular: false,
-                  ),
+                _InsightTable(
+                  title: "Perlu Perhatian",
+                  columns: const ["Nama Alat", "Terlambat"],
+                  rows: needAttention,
+                  isPopular: false,
+                ),
               ],
             ),
           ),
@@ -663,7 +558,7 @@ class _SimpleCard extends StatelessWidget {
       color: theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: theme.dividerColor.withOpacity(0.45)),
+        side: BorderSide(color: Colors.black, width: 1.5),
       ),
       clipBehavior: Clip.antiAlias,
       child: child,
@@ -683,145 +578,7 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-/* ===================== MOBILE LIST (MAIN REPORT) ===================== */
-class _MobileReportList extends StatelessWidget {
-  final List<ReportData> data;
-  final String titleCol;
-
-  const _MobileReportList({
-    required this.data,
-    required this.titleCol,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final text = theme.textTheme;
-
-    if (data.isEmpty) {
-      return _SimpleCard(
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Text("Tidak ada data.", style: text.bodyMedium),
-        ),
-      );
-    }
-
-    return Column(
-      children: data.map((r) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: _SimpleCard(
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(r.label, style: text.titleMedium),
-                  const SizedBox(height: 10),
-                  _kv("Total", r.totalLoans.toString(), text),
-                  _kv("Aktif", r.activeLoans.toString(), text),
-                  _kv("Selesai", r.completedLoans.toString(), text),
-                  _kv("Ditolak", r.rejectedLoans.toString(), text),
-                  _kv("Terlambat", r.overdueCount.toString(), text),
-                ],
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _kv(String k, String v, TextTheme text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          SizedBox(width: 90, child: Text(k, style: text.bodyMedium)),
-          Expanded(
-            child: Text(
-              v,
-              style: text.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/* ===================== MOBILE LIST (INSIGHT) ===================== */
-class _MobileInsightList extends StatelessWidget {
-  final List<ReportData> rows;
-  final bool isPopular;
-
-  const _MobileInsightList({
-    required this.rows,
-    required this.isPopular,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final text = theme.textTheme;
-
-    if (rows.isEmpty) {
-      return _SimpleCard(
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Text("Tidak ada data.", style: text.bodyMedium),
-        ),
-      );
-    }
-
-    return Column(
-      children: rows.map((r) {
-        final value = isPopular ? r.totalLoans : r.overdueCount;
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: _SimpleCard(
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      r.label,
-                      style:
-                          text.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withOpacity(0.10),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      value.toString(),
-                      style: text.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-}
-
-/* ===================== TABLE UTAMA (DESKTOP/TABLET) ===================== */
+/* ===================== TABLE UTAMA (ALL DEVICE) ===================== */
 class _MainTable extends StatelessWidget {
   final List<ReportData> data;
   final String titleCol;
@@ -834,6 +591,15 @@ class _MainTable extends StatelessWidget {
 
     final borderColor = theme.dividerColor.withOpacity(0.55);
     const radius = 14.0;
+
+    if (data.isEmpty) {
+      return _SimpleCard(
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Text("Tidak ada data.", style: text.bodyMedium),
+        ),
+      );
+    }
 
     return _SimpleCard(
       child: LayoutBuilder(
@@ -937,7 +703,7 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-/* ===================== INSIGHT TABLE (DESKTOP/TABLET) ===================== */
+/* ===================== INSIGHT TABLE (ALL DEVICE) ===================== */
 class _InsightTable extends StatelessWidget {
   final String title;
   final List<String> columns;
@@ -957,6 +723,15 @@ class _InsightTable extends StatelessWidget {
 
     final borderColor = theme.dividerColor.withOpacity(0.55);
     const radius = 14.0;
+
+    if (rows.isEmpty) {
+      return _SimpleCard(
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Text("Tidak ada data.", style: text.bodyMedium),
+        ),
+      );
+    }
 
     return _SimpleCard(
       child: LayoutBuilder(

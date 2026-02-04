@@ -374,7 +374,8 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: theme.dividerColor.withOpacity(0.12),
+          color: Colors.black,
+          width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
@@ -602,10 +603,17 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
             decoration: InputDecoration(
               labelText: 'Cari peminjaman',
               prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: theme.cardColor),
-              ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(width: 1.5), // tebal border
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                        width: 1.5,
+                        color: Colors.black,
+                      ),
+                    ),
             ),
           ),
 

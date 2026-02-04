@@ -136,17 +136,17 @@ class _SideMenuState extends State<SideMenu> {
                         title: "Log Aktivitas",
                         keyValue: "logs"),
 
-                  // if (role == "peminjam")
-                  //   _menuItem(context,
-                  //       icon: Icons.calendar_month_outlined,
-                  //       title: "Pemanjangan",
-                  //       keyValue: "panjang"),
+                  if (role == "peminjam")
+                    _menuItem(context,
+                        icon: Icons.calendar_month_outlined,
+                        title: "Pemanjangan",
+                        keyValue: "panjang"),
 
-                  // if (role == "petugas")
-                  //   _menuItem(context,
-                  //       icon: Icons.calendar_month_outlined,
-                  //       title: "Pemanjangan",
-                  //       keyValue: "hari"),
+                  if (role == "petugas")
+                    _menuItem(context,
+                        icon: Icons.calendar_month_outlined,
+                        title: "Pemanjangan",
+                        keyValue: "hari"),
 
                   if (role == "petugas")
                     _menuItem(context,
@@ -240,13 +240,13 @@ class _SideMenuState extends State<SideMenu> {
               NavigationService.navigateTo('/pinjam');
               break;
 
-            // case 'panjang':
-            //   NavigationService.navigateTo('/panjang');
-            //   break;
+            case 'panjang':
+              NavigationService.navigateTo('/panjang');
+              break;
 
-            // case 'hari':
-            //   NavigationService.navigateTo('/hari');
-            //   break;
+            case 'hari':
+              NavigationService.navigateTo('/hari');
+              break;
 
             case 'logout':
               await SupabaseService.logout(); // sudah clear cache
