@@ -5,70 +5,35 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-class Category {
-  final String id;
-  final String name;
-  final int totalItems;
-
-  Category({required this.id, required this.name, this.totalItems = 0});
-}
-
-class Alat {
-  final String id;
-  final String namaAlat;
-  final String fotoUrl;
-  final String status;
-  final String kategoriId;
-  final String kategoriNama;
-  final int denda;
-  final int perbaikan;
-  final bool? rusak; // lebih bagus final kalau tidak mau diubah manual
-
-  final Uint8List? bytes;
-
-  Alat({
-    required this.id,
-    required this.namaAlat,
-    required this.fotoUrl,
-    required this.status,
-    required this.kategoriId,
-    required this.kategoriNama,
-    required this.denda,
-    required this.perbaikan,
-    this.rusak,
-    this.bytes,
-  });
-
-  static bool? _parseBool(dynamic v) {
-    if (v == null) return null;
-    if (v is bool) return v;
-    if (v is int) return v == 1;
-    final s = v.toString().trim().toLowerCase();
-    if (s == 'true' || s == '1' || s == 'ya' || s == 'yes') return true;
-    if (s == 'false' || s == '0' || s == 'tidak' || s == 'no') return false;
-    return null;
-  }
-
-  factory Alat.fromMap(Map<String, dynamic> json) {
-    return Alat(
-      id: json['id'].toString(),
-      namaAlat: json['nama_alat'] ?? '',
-      fotoUrl: json['foto_url'] ?? '',
-      status: json['status'] ?? 'Tersedia',
-      kategoriId: json['kategori'].toString(),
-      kategoriNama: json['kategori_alat'] != null
-          ? json['kategori_alat']['kategori'] ?? ''
-          : '',
-      denda: json['denda'] ?? 0,
-      perbaikan: json['perbaikan'] ?? 0,
-      rusak: _parseBool(json['rusak']) ?? false, // ✅ ini yang kurang
-    );
-  }
-}
+import '../models/kategori_alat.dart';
+import '../models/alat.dart';
 
 class SupabaseService {
   static final SupabaseClient _client = Supabase.instance.client;
   static const _tokenKey = 'auth_token';
+
+  // ================= SESSION CACHE (ANTI DELAY) =================
+  static int? _cachedUserId;
+  static String? _cachedUsername;
+  static String? _cachedRole;
+
+  static void setSessionCache({
+    required int userId,
+    required String username,
+    required String role,
+  }) {
+    _cachedUserId = userId;
+    _cachedUsername = username;
+    _cachedRole = role;
+    debugPrint("⚡ SESSION CACHE SET: $username ($role) id=$userId");
+  }
+
+  static void clearSessionCache() {
+    _cachedUserId = null;
+    _cachedUsername = null;
+    _cachedRole = null;
+    debugPrint("🧹 SESSION CACHE CLEARED");
+  }
 
   // ================= TOKEN HANDLER =================
   static Future<void> _writeToken(String token) async {
@@ -118,8 +83,10 @@ class SupabaseService {
   }
 
   // ================= AUTH HELPERS =================
-  static Future<int?> getUserId() async {
+  static Future<int?> getUserId({bool forceRefresh = false}) async {
     try {
+      if (!forceRefresh && _cachedUserId != null) return _cachedUserId;
+
       final token = await _readToken();
       if (token == null) return null;
 
@@ -132,15 +99,19 @@ class SupabaseService {
       final id = user?['id'];
       if (id == null) return null;
 
-      return (id is int) ? id : int.tryParse(id.toString());
+      final parsed = (id is int) ? id : int.tryParse(id.toString());
+      _cachedUserId = parsed;
+      return parsed;
     } catch (e) {
       debugPrint('❌ GET USER ID ERROR: $e');
       return null;
     }
   }
 
-  static Future<String?> getRole() async {
+  static Future<String?> getRole({bool forceRefresh = false}) async {
     try {
+      if (!forceRefresh && _cachedRole != null) return _cachedRole;
+
       final token = await _readToken();
       if (token == null) return null;
 
@@ -150,15 +121,19 @@ class SupabaseService {
           .eq('token', token)
           .maybeSingle();
 
-      return user?['role'];
+      final role = user?['role']?.toString();
+      _cachedRole = role;
+      return role;
     } catch (e) {
       debugPrint('❌ GET ROLE ERROR: $e');
       return null;
     }
   }
 
-  static Future<String?> getUsername() async {
+  static Future<String?> getUsername({bool forceRefresh = false}) async {
     try {
+      if (!forceRefresh && _cachedUsername != null) return _cachedUsername;
+
       final token = await _readToken();
       if (token == null) return null;
 
@@ -168,7 +143,9 @@ class SupabaseService {
           .eq('token', token)
           .maybeSingle();
 
-      return user?['username'];
+      final uname = user?['username']?.toString();
+      _cachedUsername = uname;
+      return uname;
     } catch (e) {
       debugPrint('❌ GET USERNAME ERROR: $e');
       return null;
@@ -183,7 +160,7 @@ class SupabaseService {
     int? userId,
   }) async {
     try {
-      final uid = userId ?? await getUserId();
+      final uid = userId ?? await getUserId(); // sudah pakai cache
       if (uid == null) {
         debugPrint('⚠️ insertLog dibatalkan: userId null (belum login?)');
         return;
@@ -236,13 +213,23 @@ class SupabaseService {
         return {'success': false, 'message': 'Password salah'};
       }
 
+      // reset token lama
       await _deleteToken();
       await _writeToken((user['token'] ?? '').toString());
 
-      // ✅ log login
+      // ================= CACHE SESSION (FIX DELAY) =================
       final uid = (user['id'] is int)
-          ? user['id']
+          ? user['id'] as int
           : int.tryParse(user['id'].toString());
+
+      final uname = (user['username'] ?? '').toString();
+      final r = (user['role'] ?? '').toString();
+
+      if (uid != null) {
+        setSessionCache(userId: uid, username: uname, role: r);
+      }
+
+      // log login
       if (uid != null) {
         await insertLog(description: 'Login', userId: uid);
       }
@@ -271,17 +258,36 @@ class SupabaseService {
   // ================= AUTH CHECK =================
   static Future<bool> isLoggedIn() async {
     try {
+      // kalau cache ada -> langsung true (no delay)
+      if (_cachedUserId != null && _cachedRole != null) return true;
+
       final token = await _readToken();
       if (token == null) return false;
 
       final user = await _client
           .from('user')
-          .select('id')
+          .select('id, username, role')
           .eq('token', token)
           .maybeSingle();
 
       debugPrint('🔍 AUTH CHECK: $user');
-      return user != null;
+
+      if (user == null) return false;
+
+      // set cache biar berikutnya ga delay
+      final uid = (user['id'] is int)
+          ? user['id'] as int
+          : int.tryParse(user['id'].toString());
+
+      if (uid != null) {
+        setSessionCache(
+          userId: uid,
+          username: (user['username'] ?? '').toString(),
+          role: (user['role'] ?? '').toString(),
+        );
+      }
+
+      return true;
     } catch (e) {
       debugPrint('❌ AUTH CHECK ERROR: $e');
       return false;
@@ -391,12 +397,14 @@ class SupabaseService {
         user:user ( username )
       ''');
 
-      if (role == 'Peminjam' && userId != null)
+      if (role == 'Peminjam' && userId != null) {
         baseQuery = baseQuery.eq('user', userId);
+      }
 
       final data = await baseQuery
           .order('created_at', ascending: false)
           .limit(limit);
+
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
       debugPrint('❌ DASHBOARD ACTIVITIES ERROR: $e');
@@ -437,7 +445,6 @@ class SupabaseService {
         'role': role,
       });
 
-      // ✅ log
       await insertLog(description: 'Membuat User $username');
 
       debugPrint('✅ ADD USER SUCCESS');
@@ -455,7 +462,6 @@ class SupabaseService {
     required String role,
   }) async {
     try {
-      // ambil username lama untuk log biar sesuai permintaan: "Mengedit $user"
       final before = await _client
           .from('user')
           .select('username')
@@ -469,7 +475,6 @@ class SupabaseService {
           .update({'username': username, 'password': password, 'role': role})
           .eq('id', id);
 
-      // ✅ log
       await insertLog(description: 'Mengedit User $oldUsername');
 
       debugPrint('✅ EDIT USER SUCCESS');
@@ -482,7 +487,6 @@ class SupabaseService {
 
   static Future<bool> deleteUser({required int id}) async {
     try {
-      // ambil username untuk log
       final before = await _client
           .from('user')
           .select('username')
@@ -492,7 +496,6 @@ class SupabaseService {
 
       await _client.from('user').delete().eq('id', id);
 
-      // ✅ log
       await insertLog(description: 'Menghapus User $uname');
 
       debugPrint('✅ DELETE USER SUCCESS');
@@ -504,7 +507,7 @@ class SupabaseService {
   }
 
   // ================= CATEGORY MANAGEMENT =================
-  Future<List<Category>> getCategories() async {
+  Future<List<KategoriAlat>> getCategories() async {
     final response = await _client
         .from('kategori_alat')
         .select()
@@ -512,25 +515,26 @@ class SupabaseService {
 
     final data = response as List<dynamic>;
     return data.map((e) {
-      return Category(id: e['id'].toString(), name: e['kategori'] ?? '');
+      return KategoriAlat(id: e['id'].toString(), name: e['kategori'] ?? '');
     }).toList();
   }
 
-  Future<Category> addCategory(String name) async {
+  Future<KategoriAlat> addCategory(String name) async {
     final response = await _client
         .from('kategori_alat')
         .insert({'kategori': name})
         .select()
         .single();
 
-    // ✅ log
     await SupabaseService.insertLog(description: 'Menambah kategori $name');
 
-    return Category(id: response['id'].toString(), name: response['kategori']);
+    return KategoriAlat(
+      id: response['id'].toString(),
+      name: response['kategori'],
+    );
   }
 
-  Future<Category> editCategory(String id, String name) async {
-    // ambil nama lama untuk log
+  Future<KategoriAlat> editCategory(String id, String name) async {
     final before = await _client
         .from('kategori_alat')
         .select('kategori')
@@ -545,14 +549,15 @@ class SupabaseService {
         .select()
         .single();
 
-    // ✅ log
     await SupabaseService.insertLog(description: 'Mengedit kategori $oldName');
 
-    return Category(id: response['id'].toString(), name: response['kategori']);
+    return KategoriAlat(
+      id: response['id'].toString(),
+      name: response['kategori'],
+    );
   }
 
   Future<void> deleteCategory(String id) async {
-    // ambil nama kategori untuk log
     final before = await _client
         .from('kategori_alat')
         .select('kategori')
@@ -562,7 +567,6 @@ class SupabaseService {
 
     await _client.from('kategori_alat').delete().eq('id', id);
 
-    // ✅ log
     await SupabaseService.insertLog(description: 'Menghapus kategori $name');
   }
 
@@ -578,7 +582,6 @@ class SupabaseService {
   }
 
   // ================= ALAT =================
-
   static Future<String> uploadFoto(Uint8List bytes, String fileName) async {
     final safeName = fileName
         .trim()
@@ -650,7 +653,6 @@ class SupabaseService {
         .select()
         .single();
 
-    // ✅ log
     await SupabaseService.insertLog(description: 'Menambah Alat $namaAlat');
 
     return Alat.fromMap(res);
@@ -665,7 +667,6 @@ class SupabaseService {
     required int denda,
     required int perbaikan,
   }) async {
-    // ambil nama lama untuk log
     final before = await _client
         .from('alat')
         .select('nama_alat')
@@ -687,7 +688,6 @@ class SupabaseService {
         .select()
         .single();
 
-    // ✅ log
     await SupabaseService.insertLog(description: 'Mengedit Alat $oldName');
 
     return Alat.fromMap(res);
@@ -695,7 +695,6 @@ class SupabaseService {
 
   Future<void> deleteAlat(String id, {String? fotoUrl}) async {
     try {
-      // ambil nama alat untuk log
       final before = await _client
           .from('alat')
           .select('nama_alat')
@@ -703,15 +702,12 @@ class SupabaseService {
           .maybeSingle();
       final name = before?['nama_alat']?.toString() ?? 'Alat#$id';
 
-      // 1) hapus foto
       if (fotoUrl != null && fotoUrl.isNotEmpty) {
         await deleteFoto(fotoUrl);
       }
 
-      // 2) hapus record
       await _client.from('alat').delete().eq('id', id);
 
-      // ✅ log
       await SupabaseService.insertLog(description: 'Menghapus Alat $name');
 
       debugPrint('✅ Alat $id berhasil dihapus');
@@ -868,7 +864,8 @@ class SupabaseService {
         description: 'Menambah peminjaman $namaAlat milik $namaPeminjam',
       );
     } else {
-      await insertLog(description: '$namaPeminjam mengajukan peminjaman alat $namaAlat',
+      await insertLog(
+        description: '$namaPeminjam mengajukan peminjaman alat $namaAlat',
       );
     }
 
@@ -940,7 +937,8 @@ class SupabaseService {
     // ==========================
     // 3) Normalisasi data
     // ==========================
-    final namaAlat = updated['alat']?['nama_alat']?.toString() ?? 'Alat#$alatId';
+    final namaAlat =
+        updated['alat']?['nama_alat']?.toString() ?? 'Alat#$alatId';
     final namaPeminjam =
         updated['user']?['username']?.toString() ?? 'User#$userId';
 
@@ -977,7 +975,7 @@ class SupabaseService {
       await insertLog(
         description: 'Menolak pengembalian $namaAlat dari $namaPeminjam',
       );
-    }    
+    }
 
     return {
       'id': updated['id'],
@@ -1154,14 +1152,16 @@ class SupabaseService {
 
   // =============== Pemanjangan ==============
 
-    static Future<List<Map<String, dynamic>>> fetchPemanjanganLoans() async {
+  static Future<List<Map<String, dynamic>>> fetchPemanjanganLoans() async {
     final role = await getRole();
     final userId = await getUserId();
 
     if (role == null || userId == null) return [];
     if (role.toLowerCase().trim() != 'peminjam') return [];
 
-    final res = await _client.from('peminjaman').select('''
+    final res = await _client
+        .from('peminjaman')
+        .select('''
         id,
         status,
         tanggal_pinjam,
@@ -1200,18 +1200,21 @@ class SupabaseService {
     required dynamic peminjamanId,
     required int tambahHari,
   }) async {
-    await _client.from('peminjaman').update({
-      'tambah': tambahHari,
-      'minta': true,
-    }).eq('id', peminjamanId);
+    await _client
+        .from('peminjaman')
+        .update({'tambah': tambahHari, 'minta': true})
+        .eq('id', peminjamanId);
   }
 
-  static Future<List<Map<String, dynamic>>> fetchPemanjanganRequestsAdmin() async {
+  static Future<List<Map<String, dynamic>>>
+  fetchPemanjanganRequestsAdmin() async {
     try {
       final role = await getRole();
       if (role == null || role.toLowerCase().trim() != 'petugas') return [];
 
-      final res = await _client.from('peminjaman').select('''
+      final res = await _client
+          .from('peminjaman')
+          .select('''
         id,
         status,
         tanggal_pinjam,
@@ -1239,12 +1242,12 @@ class SupabaseService {
   /// - pengulangan + 1
   /// - minta = false
   /// - tambah = 0
-  static Future<void> approveExtension({
-    required dynamic peminjamanId,
-  }) async {
+  static Future<void> approveExtension({required dynamic peminjamanId}) async {
     try {
       // ambil data dulu
-      final row = await _client.from('peminjaman').select('''
+      final row = await _client
+          .from('peminjaman')
+          .select('''
         id,
         tanggal_kembali,
         tambah,
@@ -1255,7 +1258,8 @@ class SupabaseService {
           .eq('id', peminjamanId)
           .single();
 
-      final String tanggalKembaliStr = (row['tanggal_kembali'] ?? '').toString();
+      final String tanggalKembaliStr = (row['tanggal_kembali'] ?? '')
+          .toString();
       final int tambahHari = (row['tambah'] ?? 0) is int
           ? (row['tambah'] ?? 0)
           : int.tryParse(row['tambah'].toString()) ?? 0;
@@ -1274,16 +1278,20 @@ class SupabaseService {
       final oldDate = DateTime.parse(tanggalKembaliStr);
       final newDate = oldDate.add(Duration(days: tambahHari));
 
-      await _client.from('peminjaman').update({
-        'tanggal_kembali': newDate.toIso8601String(),
-        'pengulangan': pengulangan + 1,
-        'minta': false,
-        'tambah': 0,
-      }).eq('id', peminjamanId);
+      await _client
+          .from('peminjaman')
+          .update({
+            'tanggal_kembali': newDate.toIso8601String(),
+            'pengulangan': pengulangan + 1,
+            'minta': false,
+            'tambah': 0,
+          })
+          .eq('id', peminjamanId);
 
       // log
       await insertLog(
-        description: 'Menerima pemanjangan $namaAlat milik $namaPeminjam (+$tambahHari hari)',
+        description:
+            'Menerima pemanjangan $namaAlat milik $namaPeminjam (+$tambahHari hari)',
       );
 
       debugPrint('✅ approveExtension sukses id=$peminjamanId');
@@ -1296,11 +1304,11 @@ class SupabaseService {
   /// ADMIN: tolak permintaan pemanjangan
   /// - minta = false
   /// - tambah = 0
-  static Future<void> rejectExtension({
-    required dynamic peminjamanId,
-  }) async {
+  static Future<void> rejectExtension({required dynamic peminjamanId}) async {
     try {
-      final before = await _client.from('peminjaman').select('''
+      final before = await _client
+          .from('peminjaman')
+          .select('''
         id,
         user:user ( username ),
         alat:alat ( nama_alat ),
@@ -1313,13 +1321,14 @@ class SupabaseService {
       final namaPeminjam = before?['user']?['username']?.toString() ?? 'User';
       final tambahHari = before?['tambah'] ?? 0;
 
-      await _client.from('peminjaman').update({
-        'minta': false,
-        'tambah': 0,
-      }).eq('id', peminjamanId);
+      await _client
+          .from('peminjaman')
+          .update({'minta': false, 'tambah': 0})
+          .eq('id', peminjamanId);
 
       await insertLog(
-        description: 'Menolak pemanjangan $namaAlat milik $namaPeminjam (+$tambahHari hari)',
+        description:
+            'Menolak pemanjangan $namaAlat milik $namaPeminjam (+$tambahHari hari)',
       );
 
       debugPrint('✅ rejectExtension sukses id=$peminjamanId');
@@ -1331,6 +1340,9 @@ class SupabaseService {
 
   // ================= LOGOUT =================
   static Future<void> logout() async {
+    // FIX: reset cache supaya login berikutnya tidak nyangkut
+    clearSessionCache();
+
     await _deleteToken();
     await insertLog(description: 'Logout');
     debugPrint('👋 LOGOUT');

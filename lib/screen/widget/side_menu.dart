@@ -12,25 +12,40 @@ class SideMenu extends StatefulWidget {
 
 class _SideMenuState extends State<SideMenu> {
   String username = "User";
-  String role = "peminjam"; // default sementara
+  String role = "peminjam";
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+
+    /// FIX: langsung load dari cache dulu biar ga delay
+    _initFromCache();
+
+    /// refresh background (opsional) untuk update jika ada perubahan
+    _refreshFromSupabase();
   }
 
-  /// Load username & role dari Supabase
-  void _loadUserData() async {
-    final name = await SupabaseService.getUsername();
-    final r = await SupabaseService.getRole();
+  void _initFromCache() async {
+    final cachedName = await SupabaseService.getUsername();
+    final cachedRole = await SupabaseService.getRole();
 
-    if (mounted) {
-      setState(() {
-        username = name ?? "User";
-        role = r ?? "peminjam";
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      username = cachedName ?? "User";
+      role = cachedRole ?? "peminjam";
+    });
+  }
+
+  /// refresh data tanpa bikin delay di UI
+  void _refreshFromSupabase() async {
+    final name = await SupabaseService.getUsername(forceRefresh: true);
+    final r = await SupabaseService.getRole(forceRefresh: true);
+
+    if (!mounted) return;
+    setState(() {
+      username = name ?? username;
+      role = r ?? role;
+    });
   }
 
   @override
@@ -72,44 +87,80 @@ class _SideMenuState extends State<SideMenu> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 children: [
-                  _menuItem(context, icon: Icons.home, title: "Dashboard", keyValue: "dashboard"),
+                  _menuItem(context,
+                      icon: Icons.home,
+                      title: "Dashboard",
+                      keyValue: "dashboard"),
 
                   if (role == "admin")
-                    _menuItem(context, icon: Icons.people, title: "User", keyValue: "user"),
+                    _menuItem(context,
+                        icon: Icons.people, title: "User", keyValue: "user"),
 
                   if (role == "admin")
-                    _menuItem(context, icon: Icons.dashboard, title: "Kategori", keyValue: "kategori"),
+                    _menuItem(context,
+                        icon: Icons.dashboard,
+                        title: "Kategori",
+                        keyValue: "kategori"),
 
                   if (role == "admin")
-                    _menuItem(context, icon: Icons.inventory_2, title: "Daftar Alat", keyValue: "daftaralat"),
+                    _menuItem(context,
+                        icon: Icons.inventory_2,
+                        title: "Daftar Alat",
+                        keyValue: "daftaralat"),
 
                   if (role == "peminjam")
-                    _menuItem(context, icon: Icons.inventory_2, title: "Alat", keyValue: "alat"),
+                    _menuItem(context,
+                        icon: Icons.inventory_2, title: "Alat", keyValue: "alat"),
 
                   if (role == "peminjam")
-                    _menuItem(context, icon: Icons.assignment, title: "Peminjaman", keyValue: "pinjam"),
+                    _menuItem(context,
+                        icon: Icons.assignment,
+                        title: "Peminjaman",
+                        keyValue: "pinjam"),
 
                   if (role == "admin")
-                    _menuItem(context, icon: Icons.assignment, title: "Peminjaman", keyValue: "daftarpeminjaman"),
+                    _menuItem(context,
+                        icon: Icons.assignment,
+                        title: "Peminjaman",
+                        keyValue: "daftarpeminjaman"),
 
                   if (role == "petugas")
-                    _menuItem(context, icon: Icons.assignment, title: "Peminjaman", keyValue: "penerimaan"),
+                    _menuItem(context,
+                        icon: Icons.assignment,
+                        title: "Peminjaman",
+                        keyValue: "penerimaan"),
 
                   if (role == "admin")
-                    _menuItem(context, icon: Icons.history, title: "Log Aktivitas", keyValue: "logs"),
+                    _menuItem(context,
+                        icon: Icons.history,
+                        title: "Log Aktivitas",
+                        keyValue: "logs"),
 
-                  if (role == "peminjam")
-                    _menuItem(context, icon: Icons.calendar_month_outlined, title: "Pemanjangan", keyValue: "panjang"),
+                  // if (role == "peminjam")
+                  //   _menuItem(context,
+                  //       icon: Icons.calendar_month_outlined,
+                  //       title: "Pemanjangan",
+                  //       keyValue: "panjang"),
+
+                  // if (role == "petugas")
+                  //   _menuItem(context,
+                  //       icon: Icons.calendar_month_outlined,
+                  //       title: "Pemanjangan",
+                  //       keyValue: "hari"),
 
                   if (role == "petugas")
-                    _menuItem(context, icon: Icons.calendar_month_outlined, title: "Pemanjangan", keyValue: "hari"),
-
-                  if (role == "petugas")
-                    _menuItem(context, icon: Icons.print, title: "Laporan", keyValue: "laporan"),
+                    _menuItem(context,
+                        icon: Icons.print,
+                        title: "Laporan",
+                        keyValue: "laporan"),
 
                   const Divider(),
 
-                  _menuItem(context, icon: Icons.logout, title: "Logout", keyValue: "logout", isDanger: true),
+                  _menuItem(context,
+                      icon: Icons.logout,
+                      title: "Logout",
+                      keyValue: "logout",
+                      isDanger: true),
                 ],
               ),
             ),
@@ -143,12 +194,14 @@ class _SideMenuState extends State<SideMenu> {
               ),
         ),
         onTap: () async {
-          Navigator.of(context).pop(); // tutup drawer
+          Navigator.of(context).pop();
 
           switch (keyValue) {
             case 'dashboard':
-              final r = await SupabaseService.getRole() ?? role;
-              NavigationService.navigateAndRemoveUntil('/dashboard', arguments: r);
+              NavigationService.navigateAndRemoveUntil(
+                '/dashboard',
+                arguments: role,
+              );
               break;
 
             case 'daftaralat':
@@ -187,16 +240,16 @@ class _SideMenuState extends State<SideMenu> {
               NavigationService.navigateTo('/pinjam');
               break;
 
-            case 'panjang':
-              NavigationService.navigateTo('/panjang');
-              break;
+            // case 'panjang':
+            //   NavigationService.navigateTo('/panjang');
+            //   break;
 
-            case 'hari':
-              NavigationService.navigateTo('/hari');
-              break;
+            // case 'hari':
+            //   NavigationService.navigateTo('/hari');
+            //   break;
 
             case 'logout':
-              await SupabaseService.logout();
+              await SupabaseService.logout(); // sudah clear cache
               NavigationService.navigateAndRemoveUntil('/login');
               break;
           }

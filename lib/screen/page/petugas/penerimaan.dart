@@ -4,14 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../utils/theme.dart';
-import '../widget/app_bar.dart';
-import '../widget/side_menu.dart';
-import '../widget/pinjam_card.dart';
+import '../../utils/theme.dart';
+import '../../widget/app_bar.dart';
+import '../../widget/side_menu.dart';
+import '../../widget/pinjam_card.dart';
 
-import '../widget/detail_pinjam.dart';
-import '../widget/terima_pinjam.dart';
-import '../widget/konfirmasi_pinjam.dart';
+import '../../widget/detail_pinjam.dart';
+import '../../widget/terima_pinjam.dart';
+import '../../widget/konfirmasi_pinjam.dart';
 
 import 'package:engine_rent_app/service/supabase_service.dart';
 
@@ -33,6 +33,9 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
   Timer? _debounceReload;
   bool _isReloading = false;
 
+  // expand state per peminjaman id
+  final Set<dynamic> _expandedIds = {};
+
   @override
   void initState() {
     super.initState();
@@ -43,11 +46,13 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
 
   @override
   void dispose() {
+    _searchController.removeListener(_filter);
     _searchController.dispose();
 
     _debounceReload?.cancel();
     if (_channel != null) {
       Supabase.instance.client.removeChannel(_channel!);
+      _channel = null;
     }
 
     super.dispose();
@@ -71,7 +76,7 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
         _loading = false;
       });
 
-      // re-apply filter query (biar search tetap jalan walau data berubah)
+      // re-apply filter query
       _filter();
     } catch (e) {
       if (!mounted) return;
@@ -96,7 +101,6 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
           schema: 'public',
           table: 'peminjaman',
           callback: (payload) {
-            // Debounce supaya tidak spam _load() kalau banyak event
             _debounceReload?.cancel();
             _debounceReload = Timer(const Duration(milliseconds: 300), () {
               if (mounted) _load(showLoading: false);
@@ -174,6 +178,72 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
     return DateFormat.yMMMMd('id').format(dt);
   }
 
+  Widget _statusBadge({
+    required String text,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: theme.colorScheme.primary),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              value,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _toggleExpand(dynamic id) {
+    setState(() {
+      if (_expandedIds.contains(id)) {
+        _expandedIds.remove(id);
+      } else {
+        _expandedIds.add(id);
+      }
+    });
+  }
+
   // ===================== ACTION =====================
 
   Future<void> _openDialog(Map<String, dynamic> row) async {
@@ -196,7 +266,6 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
               status: 'dipinjam',
             );
             if (mounted) Navigator.pop(context);
-            // tidak perlu refresh manual, realtime akan update otomatis
           },
           onReject: () async {
             await SupabaseService.editPeminjaman(
@@ -273,6 +342,192 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
   int _countStatus(String status) => _all
       .where((e) => (e['status'] ?? '').toString().toLowerCase() == status)
       .length;
+
+  // ===================== CARD ITEM =====================
+
+  Widget _loanCard(BuildContext context, Map<String, dynamic> row) {
+    final theme = Theme.of(context);
+
+    final id = row['id'];
+    final isExpanded = _expandedIds.contains(id);
+
+    final peminjam = (row['username'] ?? '-').toString();
+    final alat = (row['nama_alat'] ?? '-').toString();
+
+    final statusRaw = (row['status'] ?? '').toString();
+    final statusText = _statusText(statusRaw);
+    final statusColor = _statusColor(statusRaw);
+
+    final alasan = (row['alasan'] ?? '-').toString();
+
+    final btnText = statusRaw.toLowerCase() == 'menunggu'
+        ? "Proses"
+        : statusRaw.toLowerCase() == 'diproses'
+            ? "Konfirmasi"
+            : "Detail";
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: theme.dividerColor.withOpacity(0.12),
+        ),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+            color: Colors.black.withOpacity(0.06),
+          ),
+        ],
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => _toggleExpand(id),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ===== HEADER: Peminjam kiri | Status kanan
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      peminjam,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _statusBadge(text: statusText, color: statusColor),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+
+              // ===== Nama alat
+              Text(
+                alat,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              Align(
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      isExpanded ? "Tutup detail" : "Lihat detail",
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    AnimatedRotation(
+                      duration: const Duration(milliseconds: 200),
+                      turns: isExpanded ? 0.5 : 0.0,
+                      child: Icon(
+                        Icons.expand_more,
+                        size: 24,
+                        color: theme.textTheme.bodyMedium?.color?.withOpacity(0.75),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              AnimatedCrossFade(
+                firstChild: const SizedBox.shrink(),
+                secondChild: Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Divider(
+                        height: 18,
+                        thickness: 1,
+                        color: theme.dividerColor.withOpacity(0.12),
+                      ),
+
+                      _infoRow(
+                        context,
+                        icon: Icons.notes_outlined,
+                        label: "Alasan",
+                        value: alasan,
+                      ),
+                      _infoRow(
+                        context,
+                        icon: Icons.calendar_month_outlined,
+                        label: "Tgl Pinjam",
+                        value: _formatDate(row['tanggal_pinjam']),
+                      ),
+                      _infoRow(
+                        context,
+                        icon: Icons.event_outlined,
+                        label: "Tgl Kembali",
+                        value: _formatDate(row['tanggal_kembali']),
+                      ),
+                      _infoRow(
+                        context,
+                        icon: Icons.assignment_turned_in_outlined,
+                        label: "Dikembalikan",
+                        value: _formatDate(row['tanggal_pengembalian']),
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => _openDialog(row),
+                          style: ElevatedButton.styleFrom(
+                            textStyle: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                            backgroundColor: theme.colorScheme.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
+                            minimumSize: const Size(0, 44),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: Text(btnText),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                crossFadeState:
+                    isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                duration: const Duration(milliseconds: 200),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===================== BUILD =====================
 
   @override
   Widget build(BuildContext context) {
@@ -356,121 +611,21 @@ class _PenerimaanPageState extends State<PenerimaanPage> {
 
           const SizedBox(height: 16),
 
-          // ===== DATA TABLE =====
-          Card(
-            color: theme.scaffoldBackgroundColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            elevation: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Daftar Peminjaman',
-                      style: theme.textTheme.headlineSmall),
-                  const SizedBox(height: 12),
-
-                  if (_loading)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(18),
-                        child: CircularProgressIndicator(),
-                      ),
-                    )
-                  else if (_filtered.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: Text('Data peminjaman kosong.'),
-                    )
-                  else
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        columnSpacing: 28,
-                        headingRowColor: WidgetStatePropertyAll(
-                            theme.scaffoldBackgroundColor),
-                        headingTextStyle: theme.textTheme.bodyMedium,
-                        dataTextStyle: theme.textTheme.bodyMedium,
-                        dividerThickness: 0,
-                        border: const TableBorder(
-                          bottom: BorderSide(color: Colors.black, width: 1),
-                          horizontalInside:
-                              BorderSide(color: Colors.black, width: 1),
-                        ),
-                        columns: const [
-                          DataColumn(label: Text('Peminjam')),
-                          DataColumn(label: Text('Nama Alat')),
-                          DataColumn(label: Text('Tgl Pinjam')),
-                          DataColumn(label: Text('Tgl Kembali')),
-                          DataColumn(label: Text('Dikembalikan')),
-                          DataColumn(label: Text('Status')),
-                          DataColumn(label: Center(child: Text('Aksi'))),
-                        ],
-                        rows: _filtered.map((r) {
-                          final status = (r['status'] ?? '').toString();
-                          final statusText = _statusText(status);
-
-                          return DataRow(
-                            cells: [
-                              DataCell(Text((r['username'] ?? '-').toString())),
-                              DataCell(Text((r['nama_alat'] ?? '-').toString())),
-                              DataCell(Text(_formatDate(r['tanggal_pinjam']))),
-                              DataCell(Text(_formatDate(r['tanggal_kembali']))),
-                              DataCell(Text(_formatDate(
-                                  r['tanggal_pengembalian']))),
-                              DataCell(
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: _statusColor(status),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    statusText,
-                                    style:
-                                        theme.textTheme.bodyMedium?.copyWith(
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              DataCell(
-                                Center(
-                                  child: ElevatedButton(
-                                    onPressed: () => _openDialog(r),
-                                    style: ElevatedButton.styleFrom(
-                                      textStyle: theme.textTheme.bodyMedium,
-                                      backgroundColor:
-                                          theme.colorScheme.primary,
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 12, vertical: 8),
-                                      minimumSize: const Size(0, 32),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(18),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      status.toLowerCase() == 'menunggu'
-                                          ? "Proses"
-                                          : status.toLowerCase() == 'diproses'
-                                              ? "Konfirmasi"
-                                              : "Detail",
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                ],
+          // ===== LIST CARD =====
+          if (_loading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(18),
+                child: CircularProgressIndicator(),
               ),
-            ),
-          ),
+            )
+          else if (_filtered.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('Data peminjaman kosong.'),
+            )
+          else
+            ..._filtered.map((r) => _loanCard(context, r)),
         ],
       ),
     );

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../page/alat.dart';
 import 'package:engine_rent_app/service/supabase_service.dart';
+
+import 'package:engine_rent_app/models/equipment.dart';
 
 class BorrowRequest extends StatefulWidget {
   final Equipment equipment;

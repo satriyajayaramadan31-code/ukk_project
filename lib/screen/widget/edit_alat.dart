@@ -1,5 +1,6 @@
 import 'dart:typed_data';
-
+import 'package:engine_rent_app/models/kategori_alat.dart';
+import 'package:engine_rent_app/models/alat.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -8,7 +9,7 @@ import 'package:engine_rent_app/service/supabase_service.dart';
 
 class EditAlatDialog extends StatefulWidget {
   final Alat alat;
-  final List<Category> categories;
+  final List<KategoriAlat> categories;
 
   const EditAlatDialog({
     super.key,

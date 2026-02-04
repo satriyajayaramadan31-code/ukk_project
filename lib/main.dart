@@ -5,21 +5,21 @@ import 'package:intl/date_symbol_data_local.dart';
 import '../service/supabase_service.dart';
 import '../service/navigation_service.dart';
 
-import '../screen/page/login.dart';
-import '../screen/page/dashboard.dart';
-import '../screen/page/kategori.dart';
+import 'screen/page/all/login.dart';
+import 'screen/page/all/dashboard.dart';
+import 'screen/page/admin/kategori.dart';
 import '../screen/utils/theme.dart';
-import '../screen/page/daftar_alat.dart';
-import '../screen/page/user.dart';
-import '../screen/page/daftar_pinjam.dart';
-import '../screen/page/logs.dart';
-import '../screen/page/penerimaan.dart';
-import '../screen/page/laporan.dart';
-import '../screen/page/alat.dart';
-import '../screen/page/peminjaman.dart';
-import '../screen/page/splash_screen.dart';
-import '../screen/page/hari.dart';
-import '../screen/page/pemanjangan.dart';
+import 'screen/page/admin/daftar_alat.dart';
+import 'screen/page/admin/user.dart';
+import 'screen/page/admin/daftar_pinjam.dart';
+import 'screen/page/admin/logs.dart';
+import 'screen/page/petugas/penerimaan.dart';
+import 'screen/page/petugas/laporan.dart';
+import 'screen/page/peminjam/alat.dart';
+import 'screen/page/peminjam/peminjaman.dart';
+import 'screen/page/all/splash_screen.dart';
+// import 'screen/page/petugas/hari.dart';
+// import 'screen/page/peminjam/pemanjangan.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -75,8 +75,8 @@ class MyApp extends StatelessWidget {
         '/laporan': (_) => const LaporanPage(),
         '/alat': (_) => const AlatPage(),
         '/pinjam': (_) => const PeminjamanPage(),
-        '/panjang': (_) => const PemanjanganPage(),
-        '/hari': (_) => const HariPage(),
+        // '/panjang': (_) => const PemanjanganPage(),
+        // '/hari': (_) => const HariPage(),
       },
     );
   }

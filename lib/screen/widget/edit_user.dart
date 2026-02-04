@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../page/user.dart';
+import 'package:engine_rent_app/models/user.dart';
+import '../page/admin/user.dart';
 
 class EditUserDialog extends StatefulWidget {
   final User user;

@@ -1,13 +1,18 @@
 import 'dart:io';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../utils/theme.dart';
 import 'package:engine_rent_app/service/supabase_service.dart' as sbs;
+import 'package:engine_rent_app/models/kategori_alat.dart';
 
 class AddAlatDialog extends StatefulWidget {
-  final List<sbs.Category> categories;
+  /// FIX: gunakan model yang benar (KategoriAlat), bukan sbs.Category
+  final List<KategoriAlat> categories;
 
   const AddAlatDialog({super.key, required this.categories});
 
@@ -136,15 +141,29 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
     final namaInput = nameController.text.trim();
 
     try {
-      final selectedCategory =
-          widget.categories.firstWhere((c) => c.id == selectedCategoryId);
+      /// FIX: cari kategori berdasarkan id, tapi id dari model bisa nullable
+      final selectedCategory = widget.categories.firstWhere(
+        (c) => (c.id ?? '') == selectedCategoryId,
+      );
+
+      final kategoriId = selectedCategory.id;
+      if (kategoriId == null || kategoriId.isEmpty) {
+        // ini untuk jaga-jaga kalau data kategori invalid
+        setState(() {
+          categoryError = true;
+          _isSubmitting = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Kategori tidak valid.")),
+        );
+        return;
+      }
 
       // ================= INSERT ALAT DULU (tanpa foto) =================
-      // kalau duplicate nama -> error di sini, jadi FOTO TIDAK AKAN TERUPLOAD
       final alat = await sbs.SupabaseService().addAlat(
         namaAlat: namaInput,
         status: status,
-        kategoriId: selectedCategory.id,
+        kategoriId: kategoriId,
         denda: int.parse(dendaController.text.trim()),
         perbaikan: int.parse(perbaikanController.text.trim()),
         fotoUrl: '',
@@ -180,7 +199,9 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
       if (e.code == '23505') {
         setState(() => nameError = true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Nama alat sudah ada! Gunakan nama lain.")),
+          const SnackBar(
+            content: Text("Nama alat sudah ada! Gunakan nama lain."),
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -215,7 +236,10 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Center(
-                child: Text("Tambah Alat", style: theme.textTheme.headlineSmall),
+                child: Text(
+                  "Tambah Alat",
+                  style: theme.textTheme.headlineSmall,
+                ),
               ),
               const SizedBox(height: 16),
 
@@ -254,12 +278,20 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
               const SizedBox(height: 12),
 
               _label("Biaya Denda"),
-              _textField(dendaController, isNumber: true, enabled: !_isSubmitting),
+              _textField(
+                dendaController,
+                isNumber: true,
+                enabled: !_isSubmitting,
+              ),
               if (dendaError) _error("Denda wajib diisi dan berupa angka"),
               const SizedBox(height: 12),
 
               _label("Biaya Perbaikan"),
-              _textField(perbaikanController, isNumber: true, enabled: !_isSubmitting),
+              _textField(
+                perbaikanController,
+                isNumber: true,
+                enabled: !_isSubmitting,
+              ),
               if (perbaikanError) _error("Perbaikan wajib diisi dan berupa angka"),
               const SizedBox(height: 20),
 
@@ -289,14 +321,23 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
                   Expanded(
                     child: OutlinedButton(
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: theme.colorScheme.primary, width: 1.5),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                        side: BorderSide(
+                          color: theme.colorScheme.primary,
+                          width: 1.5,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                      onPressed:
+                          _isSubmitting ? null : () => Navigator.pop(context),
                       child: const Text(
                         'Batal',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -309,10 +350,8 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
     );
   }
 
-  Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text),
-      );
+  Widget _label(String text) =>
+      Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(text));
 
   Widget _textField(
     TextEditingController controller, {
@@ -341,7 +380,12 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
         focusedBorder: _border,
       ),
       items: widget.categories
-          .map((c) => DropdownMenuItem<String>(value: c.id, child: Text(c.name)))
+          .map(
+            (c) => DropdownMenuItem<String>(
+              value: c.id ?? '',
+              child: Text(c.name ?? '-'),
+            ),
+          )
           .toList(),
       onChanged: _isSubmitting
           ? null
@@ -356,7 +400,11 @@ class _AddAlatDialogState extends State<AddAlatDialog> {
     return ElevatedButton.icon(
       onPressed: _isSubmitting ? null : _pickImage,
       icon: const Icon(Icons.photo),
-      label: Text((imageFile != null || imageBytes != null) ? "Ganti Foto" : "Upload Foto"),
+      label: Text(
+        (imageFile != null || imageBytes != null)
+            ? "Ganti Foto"
+            : "Upload Foto",
+      ),
     );
   }
 

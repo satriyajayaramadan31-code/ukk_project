@@ -3,37 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../widget/app_bar.dart';
-import '../widget/side_menu.dart';
-import '../utils/theme.dart';
-import '../widget/borrow_request.dart';
+import '../../widget/app_bar.dart';
+import '../../widget/side_menu.dart';
+import '../../utils/theme.dart';
+import '../../widget/borrow_request.dart';
 import 'package:engine_rent_app/service/supabase_service.dart';
-
-class Equipment {
-  final String id;
-  final String name;
-  final String category;
-  final String image;
-  final String status;
-
-  Equipment({
-    required this.id,
-    required this.name,
-    required this.category,
-    required this.image,
-    required this.status,
-  });
-
-  factory Equipment.fromAlat(Alat a) {
-    return Equipment(
-      id: a.id,
-      name: a.namaAlat,
-      category: a.kategoriNama,
-      image: a.fotoUrl,
-      status: a.status,
-    );
-  }
-}
+import 'package:engine_rent_app/models/equipment.dart';
 
 class AlatPage extends StatefulWidget {
   const AlatPage({super.key});

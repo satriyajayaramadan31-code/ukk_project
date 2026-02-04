@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../utils/theme.dart';
-import '../widget/activity_item.dart';
-import '../widget/stat_card.dart';
-import '../widget/app_bar.dart';
-import '../widget/side_menu.dart';
+import '../../utils/theme.dart';
+import '../../widget/activity_item.dart';
+import '../../widget/stat_card.dart';
+import '../../widget/app_bar.dart';
+import '../../widget/side_menu.dart';
 import 'package:engine_rent_app/service/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 

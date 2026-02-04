@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../widget/app_bar.dart';
-import '../widget/side_menu.dart';
+import '../../widget/app_bar.dart';
+import '../../widget/side_menu.dart';
 import 'package:engine_rent_app/service/supabase_service.dart';
 
 class LogsPage extends StatefulWidget {
